@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: fortiqfunded-backend
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        value: https://qhfsvazxpnjwfxhamkea.supabase.co
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
