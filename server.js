@@ -295,11 +295,79 @@ app.post('/notify-payout', async (req, res) => {
   }
 });
 
-// Check every 2 minutes
+// Check payments every 2 minutes
 cron.schedule('*/2 * * * *', checkPendingPayments);
+
+// Reset daily loss at midnight UTC every day
+cron.schedule('0 0 * * *', async function() {
+  console.log('Resetting daily loss for all active accounts...');
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .update({ daily_loss: 0 })
+      .in('status', ['to_be_active', 'active', 'funded']);
+    if (error) {
+      console.log('Daily loss reset error:', error.message);
+    } else {
+      console.log('Daily loss reset complete');
+    }
+  } catch (err) {
+    console.log('Daily loss reset failed:', err.message);
+  }
+});
 
 app.get('/', (req, res) => res.send('Fortiq Funded Backend Running'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// ── REFERRAL TRACKING ──
+app.post('/track-referral', async (req, res) => {
+  const { referrer_code, referred_user_id } = req.body;
+  if (!referrer_code || !referred_user_id) {
+    return res.status(400).json({ error: 'Missing referrer_code or referred_user_id' });
+  }
+  try {
+    // Find referrer profile by user_id or referral_code
+    const { data: referrer } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .or('user_id.eq.' + referrer_code + ',referral_code.eq.' + referrer_code)
+      .single();
+
+    if (!referrer) {
+      return res.status(404).json({ error: 'Referrer not found' });
+    }
+
+    // Check if referral already exists
+    const { data: existing } = await supabase
+      .from('affiliates')
+      .select('id')
+      .eq('referrer_id', referrer.user_id)
+      .eq('referred_id', referred_user_id)
+      .single();
+
+    if (existing) {
+      return res.json({ success: true, message: 'Referral already tracked' });
+    }
+
+    // Insert referral record
+    const { error } = await supabase.from('affiliates').insert({
+      referrer_id: referrer.user_id,
+      referred_id: referred_user_id,
+      status: 'pending',
+      commission: 50,
+      paid: false
+    });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log('Referral tracked:', referrer.user_id, '->', referred_user_id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.post('/check-payment', async (req, res) => {
   await checkPendingPayments();
