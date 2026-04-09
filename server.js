@@ -147,6 +147,16 @@ async function activateChallenge(payment) {
   );
 }
 
+// ── ADMIN LOGIN ──
+app.post('/admin-login', (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ success: false, error: 'Missing password' });
+  if (password === process.env.ADMIN_PASSWORD) {
+    return res.json({ success: true });
+  }
+  return res.status(401).json({ success: false, error: 'Incorrect password' });
+});
+
 // ── PAYOUT NOTIFICATION ENDPOINT ──
 app.post('/notify-payout', async (req, res) => {
   const { account_id, payout_amount, wallet_address } = req.body;
@@ -156,7 +166,6 @@ app.post('/notify-payout', async (req, res) => {
   }
 
   try {
-    // Get account details
     const { data: account, error: accErr } = await supabase
       .from('accounts')
       .select('user_id, profit')
@@ -167,7 +176,6 @@ app.post('/notify-payout', async (req, res) => {
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Get trader profile (email, name)
     const { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select('full_name, email, user_id')
@@ -182,110 +190,45 @@ app.post('/notify-payout', async (req, res) => {
     const traderEmail = profile.email;
     const totalProfit = parseFloat(account.profit || 0).toFixed(2);
 
-    // Send email to trader
     const traderHtml = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#04060f;font-family:'Outfit',Arial,sans-serif;color:#e8e6ff;">
   <div style="max-width:560px;margin:40px auto;background:#070b18;border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;">
-    
-    <!-- Header -->
     <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
       <div style="font-size:28px;margin-bottom:8px;">🎉</div>
-      <h1 style="font-family:'Cinzel',Georgia,serif;font-size:22px;font-weight:700;margin:0;background:linear-gradient(135deg,#c9a84c,#e8c96a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
-        Payout Sent!
-      </h1>
+      <h1 style="font-family:'Cinzel',Georgia,serif;font-size:22px;font-weight:700;margin:0;background:linear-gradient(135deg,#c9a84c,#e8c96a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Payout Sent!</h1>
       <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Fortiq Funded — Profit Share Payment</p>
     </div>
-
-    <!-- Body -->
     <div style="padding:32px;">
       <p style="font-size:15px;color:#e8e6ff;margin:0 0 20px;">Hi ${traderName},</p>
-      <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
-        Congratulations on passing the Fortiq Funded challenge! Your 80% profit share has been sent to your wallet. Here are the details:
-      </p>
-
-      <!-- Payment Details -->
+      <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">Congratulations on passing the Fortiq Funded challenge! Your 80% profit share has been sent to your wallet.</p>
       <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-          <span style="color:#7a7a9a;font-size:13px;">Account ID</span>
-          <span style="color:#a78bfa;font-family:monospace;font-size:13px;">${account_id}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-          <span style="color:#7a7a9a;font-size:13px;">Total Profit Earned</span>
-          <span style="color:#00d68f;font-family:monospace;font-size:13px;">$${totalProfit} USDT</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-          <span style="color:#7a7a9a;font-size:13px;">Your Share (80%)</span>
-          <span style="color:#c9a84c;font-family:monospace;font-size:16px;font-weight:700;">$${payout_amount} USDT</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-          <span style="color:#7a7a9a;font-size:13px;">Payment Method</span>
-          <span style="color:#e8e6ff;font-size:13px;">USDT TRC20</span>
-        </div>
-        <div style="padding:10px 0;">
-          <span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet Address</span>
-          <span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">${wallet_address}</span>
-        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">${account_id}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Total Profit Earned</span><span style="color:#00d68f;font-family:monospace;font-size:13px;">$${totalProfit} USDT</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Your Share (80%)</span><span style="color:#c9a84c;font-family:monospace;font-size:16px;font-weight:700;">$${payout_amount} USDT</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Payment Method</span><span style="color:#e8e6ff;font-size:13px;">USDT TRC20</span></div>
+        <div style="padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet Address</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">${wallet_address}</span></div>
       </div>
-
-      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
-        The USDT should appear in your wallet within a few minutes depending on network congestion. 
-        If you don't see it after 30 minutes, please contact us at 
-        <a href="mailto:payments@fortiqfunded.com" style="color:#a78bfa;">payments@fortiqfunded.com</a>
-      </p>
-
-      <!-- Note -->
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">The USDT should appear in your wallet within a few minutes. If you don't see it after 30 minutes, contact <a href="mailto:payments@fortiqfunded.com" style="color:#a78bfa;">payments@fortiqfunded.com</a></p>
       <div style="background:rgba(108,61,232,0.08);border:1px solid rgba(108,61,232,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
-        <p style="font-size:13px;color:#a78bfa;margin:0;line-height:1.6;">
-          💡 <strong>What's next?</strong> This funded account has reached its lifetime profit cap. 
-          If you'd like to continue trading with Fortiq Funded, you can purchase a new challenge at any time.
-        </p>
+        <p style="font-size:13px;color:#a78bfa;margin:0;line-height:1.6;">💡 <strong>What's next?</strong> This funded account has reached its lifetime profit cap. Purchase a new challenge to continue trading.</p>
       </div>
-
-      <!-- CTA -->
       <div style="text-align:center;margin-bottom:24px;">
-        <a href="https://fortiqfunded.com/checkout.html" 
-           style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">
-          Start New Challenge
-        </a>
+        <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge</a>
       </div>
-
-      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">
-        Thank you for trading with Fortiq Funded. We look forward to funding you again!
-      </p>
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">Thank you for trading with Fortiq Funded!</p>
     </div>
-
-    <!-- Footer -->
     <div style="background:#04060f;padding:20px 32px;border-top:1px solid rgba(255,255,255,0.04);text-align:center;">
-      <p style="font-size:11px;color:#555575;margin:0;">
-        Fortiq Funded — Fortiq Prop Digital<br>
-        <a href="https://fortiqfunded.com" style="color:#6c3de8;text-decoration:none;">fortiqfunded.com</a> · 
-        <a href="mailto:support@fortiqfunded.com" style="color:#6c3de8;text-decoration:none;">support@fortiqfunded.com</a>
-      </p>
+      <p style="font-size:11px;color:#555575;margin:0;">Fortiq Funded — Fortiq Prop Digital<br><a href="https://fortiqfunded.com" style="color:#6c3de8;text-decoration:none;">fortiqfunded.com</a> · <a href="mailto:support@fortiqfunded.com" style="color:#6c3de8;text-decoration:none;">support@fortiqfunded.com</a></p>
     </div>
   </div>
 </body>
 </html>`;
 
-    await sendTraderEmail(
-      traderEmail,
-      '🎉 Your Fortiq Funded Payout Has Been Sent — $' + payout_amount + ' USDT',
-      traderHtml
-    );
-
-    // Also notify admin
-    await sendEmail(
-      'Payout Processed — ' + account_id,
-      'Payout has been marked as sent.\n\n' +
-      'Account: ' + account_id + '\n' +
-      'Trader: ' + traderName + '\n' +
-      'Email: ' + traderEmail + '\n' +
-      'Amount: $' + payout_amount + ' USDT\n' +
-      'Wallet: ' + wallet_address + '\n' +
-      'Total Profit: $' + totalProfit + ' USDT'
-    );
+    await sendTraderEmail(traderEmail, '🎉 Your Fortiq Funded Payout Has Been Sent — $' + payout_amount + ' USDT', traderHtml);
+    await sendEmail('Payout Processed — ' + account_id, 'Payout has been marked as sent.\n\nAccount: ' + account_id + '\nTrader: ' + traderName + '\nEmail: ' + traderEmail + '\nAmount: $' + payout_amount + ' USDT\nWallet: ' + wallet_address + '\nTotal Profit: $' + totalProfit + ' USDT');
 
     res.json({ success: true, message: 'Payout notification sent to ' + traderEmail });
 
@@ -326,7 +269,6 @@ app.post('/track-referral', async (req, res) => {
     return res.status(400).json({ error: 'Missing referrer_code or referred_user_id' });
   }
   try {
-    // Find referrer profile by user_id or referral_code
     const { data: referrer } = await supabase
       .from('profiles')
       .select('user_id')
@@ -337,7 +279,6 @@ app.post('/track-referral', async (req, res) => {
       return res.status(404).json({ error: 'Referrer not found' });
     }
 
-    // Check if referral already exists
     const { data: existing } = await supabase
       .from('affiliates')
       .select('id')
@@ -349,7 +290,6 @@ app.post('/track-referral', async (req, res) => {
       return res.json({ success: true, message: 'Referral already tracked' });
     }
 
-    // Insert referral record
     const { error } = await supabase.from('affiliates').insert({
       referrer_id: referrer.user_id,
       referred_id: referred_user_id,
