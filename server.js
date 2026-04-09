@@ -50,6 +50,117 @@ async function sendTraderEmail(toEmail, subject, html) {
   }
 }
 
+// ── EMAIL TEMPLATES ──
+
+function emailFooter() {
+  return `
+    <div style="background:#04060f;padding:20px 32px;border-top:1px solid rgba(255,255,255,0.04);text-align:center;">
+      <p style="font-size:11px;color:#555575;margin:0;">Fortiq Funded — Fortiq Prop Digital<br>
+      <a href="https://fortiqfunded.com" style="color:#6c3de8;text-decoration:none;">fortiqfunded.com</a> · 
+      <a href="mailto:support@fortiqfunded.com" style="color:#6c3de8;text-decoration:none;">support@fortiqfunded.com</a></p>
+    </div>`;
+}
+
+function emailWrapper(content) {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#04060f;font-family:Arial,sans-serif;color:#e8e6ff;">
+  <div style="max-width:560px;margin:40px auto;background:#070b18;border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;">
+    ${content}
+    ${emailFooter()}
+  </div>
+</body>
+</html>`;
+}
+
+function challengeActivatedEmail(traderName, accId, amount) {
+  return emailWrapper(`
+    <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(108,61,232,0.2);">
+      <div style="font-size:28px;margin-bottom:8px;">🚀</div>
+      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#a78bfa;">Challenge Activated!</h1>
+      <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Your Fortiq Funded evaluation is live</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
+      <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
+        Your payment of <strong style="color:#e8e6ff;">$${amount} USDT</strong> has been confirmed and your challenge account is now active. You can start trading immediately!
+      </p>
+      <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">${accId}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account Size</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">$5,000 USDT</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Profit Target</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Daily Loss Limit</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5% ($250)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;">Min Active Days</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5 Days</span></div>
+      </div>
+      <div style="background:rgba(108,61,232,0.08);border:1px solid rgba(108,61,232,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
+        <p style="font-size:13px;color:#a78bfa;margin:0;line-height:1.6;">💡 <strong>Reminder:</strong> Trade at least 5 active days, hit 8% profit, and stay within the daily loss and drawdown limits to pass the challenge.</p>
+      </div>
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="https://fortiqfunded.com/dashboard.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Open Trading Terminal</a>
+      </div>
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">Good luck! If you have any questions, contact us at <a href="mailto:support@fortiqfunded.com" style="color:#a78bfa;">support@fortiqfunded.com</a></p>
+    </div>`);
+}
+
+function challengeFailedEmail(traderName, accId, reason) {
+  return emailWrapper(`
+    <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(240,61,61,0.2);">
+      <div style="font-size:28px;margin-bottom:8px;">❌</div>
+      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#f03d3d;">Challenge Failed</h1>
+      <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Your Fortiq Funded evaluation has ended</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
+      <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
+        Unfortunately your challenge account <strong style="color:#e8e6ff;">${accId}</strong> has been marked as failed. ${reason ? 'Reason: <strong style="color:#e8e6ff;">' + reason + '</strong>' : 'A trading rule was breached.'}
+      </p>
+      <div style="background:rgba(240,61,61,0.06);border:1px solid rgba(240,61,61,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
+        <p style="font-size:13px;color:#f03d3d;margin:0;line-height:1.6;">Don't give up — every great trader has setbacks. Review what happened, adjust your strategy, and try again.</p>
+      </div>
+      <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
+        <p style="font-size:13px;color:#7a7a9a;margin:0 0 12px;font-weight:600;">Quick reminder of the rules:</p>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:12px;">Profit Target</span><span style="color:#e8e6ff;font-size:12px;">8% ($400)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:12px;">Daily Loss Limit</span><span style="color:#e8e6ff;font-size:12px;">5% max ($250)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:12px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:12px;">8% max ($400)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:12px;">Min Active Days</span><span style="color:#e8e6ff;font-size:12px;">5 days</span></div>
+      </div>
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Try Again — $150</a>
+      </div>
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">Questions? Contact us at <a href="mailto:support@fortiqfunded.com" style="color:#a78bfa;">support@fortiqfunded.com</a></p>
+    </div>`);
+}
+
+function challengeFundedEmail(traderName, accId, profit) {
+  const payout = (parseFloat(profit) * 0.8).toFixed(2);
+  return emailWrapper(`
+    <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
+      <div style="font-size:28px;margin-bottom:8px;">🏆</div>
+      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#c9a84c;">Challenge Passed!</h1>
+      <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">You are now a funded Fortiq trader</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
+      <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
+        Congratulations! You have successfully passed the Fortiq Funded evaluation challenge. Your account <strong style="color:#e8e6ff;">${accId}</strong> is now a funded account.
+      </p>
+      <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">${accId}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Total Profit</span><span style="color:#00d68f;font-size:13px;font-weight:600;">$${parseFloat(profit).toFixed(2)} USDT</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;">Your Payout (80%)</span><span style="color:#c9a84c;font-size:16px;font-weight:700;">$${payout} USDT</span></div>
+      </div>
+      <div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
+        <p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">💰 <strong>Next step:</strong> Log in to your dashboard, go to the Payouts section, and submit your TRC20 wallet address to receive your <strong>$${payout} USDT</strong> payout. Payouts are processed every Saturday.</p>
+      </div>
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="https://fortiqfunded.com/dashboard.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Claim Your Payout →</a>
+      </div>
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">Questions about your payout? Contact us at <a href="mailto:payments@fortiqfunded.com" style="color:#a78bfa;">payments@fortiqfunded.com</a></p>
+    </div>`);
+}
+
 async function checkPendingPayments() {
   console.log('Checking pending payments...');
   const { data: payments } = await supabase
@@ -115,7 +226,7 @@ async function activateChallenge(payment) {
   const userNum = profile.user_id.replace('USR-', '');
   const accId = 'ACC-' + userNum;
 
-  const { error } = await supabase.from('accounts').upsert({
+  await supabase.from('accounts').upsert({
     user_id: payment.user_id,
     account_id: accId,
     account_type: 'challenge',
@@ -134,6 +245,7 @@ async function activateChallenge(payment) {
 
   console.log('Challenge activated:', accId);
 
+  // Email to admin
   await sendEmail(
     'New Challenge Activated — Fortiq Funded',
     'A new challenge has been activated!\n\n' +
@@ -145,7 +257,69 @@ async function activateChallenge(payment) {
     'TX Hash: ' + payment.tx_hash + '\n' +
     'Confirmations: ' + payment.confirmations
   );
+
+  // Email to trader
+  await sendTraderEmail(
+    profile.email,
+    '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId,
+    challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2))
+  );
 }
+
+// ── NOTIFY ACCOUNT STATUS CHANGE (called from admin or automated system) ──
+app.post('/notify-status', async (req, res) => {
+  const { account_id, status, reason } = req.body;
+  if (!account_id || !status) {
+    return res.status(400).json({ error: 'Missing account_id or status' });
+  }
+  try {
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('user_id, profit')
+      .eq('account_id', account_id)
+      .single();
+
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', account.user_id)
+      .single();
+
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+    const traderName = profile.full_name || 'Trader';
+    const traderEmail = profile.email;
+
+    if (status === 'failed') {
+      await sendTraderEmail(
+        traderEmail,
+        '❌ Your Fortiq Funded Challenge Has Ended — ' + account_id,
+        challengeFailedEmail(traderName, account_id, reason || '')
+      );
+      await sendEmail(
+        'Challenge Failed — ' + account_id,
+        'Account ' + account_id + ' has been marked as failed.\nTrader: ' + traderName + '\nEmail: ' + traderEmail + (reason ? '\nReason: ' + reason : '')
+      );
+    } else if (status === 'funded') {
+      await sendTraderEmail(
+        traderEmail,
+        '🏆 Congratulations! You Passed the Fortiq Funded Challenge — ' + account_id,
+        challengeFundedEmail(traderName, account_id, account.profit || 0)
+      );
+      await sendEmail(
+        'Challenge Passed — ' + account_id,
+        'Account ' + account_id + ' has been marked as funded!\nTrader: ' + traderName + '\nEmail: ' + traderEmail + '\nProfit: $' + account.profit
+      );
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Notify status error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── ADMIN LOGIN ──
 app.post('/admin-login', (req, res) => {
@@ -194,11 +368,11 @@ app.post('/notify-payout', async (req, res) => {
 <!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#04060f;font-family:'Outfit',Arial,sans-serif;color:#e8e6ff;">
+<body style="margin:0;padding:0;background:#04060f;font-family:Arial,sans-serif;color:#e8e6ff;">
   <div style="max-width:560px;margin:40px auto;background:#070b18;border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;">
     <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
       <div style="font-size:28px;margin-bottom:8px;">🎉</div>
-      <h1 style="font-family:'Cinzel',Georgia,serif;font-size:22px;font-weight:700;margin:0;background:linear-gradient(135deg,#c9a84c,#e8c96a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Payout Sent!</h1>
+      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#c9a84c;">Payout Sent!</h1>
       <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Fortiq Funded — Profit Share Payment</p>
     </div>
     <div style="padding:32px;">
@@ -234,6 +408,49 @@ app.post('/notify-payout', async (req, res) => {
 
   } catch (err) {
     console.log('Payout notification error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── LEADERBOARD ──
+app.get('/leaderboard', async (req, res) => {
+  try {
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('account_id, user_id, profit, active_days, status')
+      .in('status', ['funded', 'active'])
+      .order('profit', { ascending: false })
+      .limit(20);
+
+    if (!accounts || accounts.length === 0) {
+      return res.json({ leaderboard: [] });
+    }
+
+    const leaderboard = await Promise.all(accounts.map(async (acc, index) => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', acc.user_id)
+        .single();
+
+      const name = profile ? profile.full_name : 'Anonymous Trader';
+      const firstName = name.split(' ')[0];
+      const lastInitial = name.split(' ')[1] ? name.split(' ')[1][0] + '.' : '';
+
+      return {
+        rank: index + 1,
+        name: firstName + (lastInitial ? ' ' + lastInitial : ''),
+        account_id: acc.account_id,
+        profit: parseFloat(acc.profit || 0).toFixed(2),
+        profit_pct: ((parseFloat(acc.profit || 0) / 5000) * 100).toFixed(2),
+        active_days: acc.active_days || 0,
+        status: acc.status
+      };
+    }));
+
+    res.json({ leaderboard });
+  } catch (err) {
+    console.log('Leaderboard error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
