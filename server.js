@@ -266,7 +266,7 @@ async function activateChallenge(payment) {
   );
 }
 
-// ── NOTIFY ACCOUNT STATUS CHANGE (called from admin or automated system) ──
+// ── NOTIFY ACCOUNT STATUS CHANGE ──
 app.post('/notify-status', async (req, res) => {
   const { account_id, status, reason } = req.body;
   if (!account_id || !status) {
@@ -412,13 +412,14 @@ app.post('/notify-payout', async (req, res) => {
   }
 });
 
-// ── LEADERBOARD ──
+// ── LEADERBOARD — only shows paid out traders ──
 app.get('/leaderboard', async (req, res) => {
   try {
     const { data: accounts } = await supabase
       .from('accounts')
-      .select('account_id, user_id, profit, active_days, status')
-      .in('status', ['funded', 'active'])
+      .select('account_id, user_id, profit, active_days, status, payout_amount')
+      .eq('status', 'funded')
+      .eq('paid_out', true)
       .order('profit', { ascending: false })
       .limit(20);
 
@@ -442,6 +443,7 @@ app.get('/leaderboard', async (req, res) => {
         name: firstName + (lastInitial ? ' ' + lastInitial : ''),
         account_id: acc.account_id,
         profit: parseFloat(acc.profit || 0).toFixed(2),
+        payout: parseFloat(acc.payout_amount || 0).toFixed(2),
         profit_pct: ((parseFloat(acc.profit || 0) / 5000) * 100).toFixed(2),
         active_days: acc.active_days || 0,
         status: acc.status
