@@ -2,9 +2,9 @@
   "name": "fortiqfunded-backend",
   "version": "1.0.0",
   "description": "Fortiq Funded payment monitoring backend",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
