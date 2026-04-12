@@ -1,7 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cron = require('node-cron');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -12,20 +12,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-const mailer = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ── Email to admin ──
 async function sendEmail(subject, text) {
   try {
-    await mailer.sendMail({
-      from: 'payments@fortiqfunded.com',
-      to: 'payments@fortiqfunded.com',
+    await resend.emails.send({
+      from: 'Fortiq Funded <support@fortiqfunded.com>',
+      to: 'support@fortiqfunded.com',
       subject: subject,
       text: text
     });
@@ -38,8 +32,8 @@ async function sendEmail(subject, text) {
 // ── Email to trader ──
 async function sendTraderEmail(toEmail, subject, html) {
   try {
-    await mailer.sendMail({
-      from: '"Fortiq Funded" <payments@fortiqfunded.com>',
+    await resend.emails.send({
+      from: 'Fortiq Funded <support@fortiqfunded.com>',
       to: toEmail,
       subject: subject,
       html: html
@@ -157,7 +151,7 @@ function challengeFundedEmail(traderName, accId, profit) {
       <div style="text-align:center;margin-bottom:24px;">
         <a href="https://fortiqfunded.com/dashboard.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Claim Your Payout →</a>
       </div>
-      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">Questions about your payout? Contact us at <a href="mailto:payments@fortiqfunded.com" style="color:#a78bfa;">payments@fortiqfunded.com</a></p>
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0;">Questions about your payout? Contact us at <a href="mailto:support@fortiqfunded.com" style="color:#a78bfa;">support@fortiqfunded.com</a></p>
     </div>`);
 }
 
@@ -245,7 +239,6 @@ async function activateChallenge(payment) {
 
   console.log('Challenge activated:', accId);
 
-  // Email to admin
   await sendEmail(
     'New Challenge Activated — Fortiq Funded',
     'A new challenge has been activated!\n\n' +
@@ -258,7 +251,6 @@ async function activateChallenge(payment) {
     'Confirmations: ' + payment.confirmations
   );
 
-  // Email to trader
   await sendTraderEmail(
     profile.email,
     '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId,
@@ -385,7 +377,7 @@ app.post('/notify-payout', async (req, res) => {
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Payment Method</span><span style="color:#e8e6ff;font-size:13px;">USDT TRC20</span></div>
         <div style="padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet Address</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">${wallet_address}</span></div>
       </div>
-      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">The USDT should appear in your wallet within a few minutes. If you don't see it after 30 minutes, contact <a href="mailto:payments@fortiqfunded.com" style="color:#a78bfa;">payments@fortiqfunded.com</a></p>
+      <p style="font-size:13px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">The USDT should appear in your wallet within a few minutes. If you don't see it after 30 minutes, contact <a href="mailto:support@fortiqfunded.com" style="color:#a78bfa;">support@fortiqfunded.com</a></p>
       <div style="background:rgba(108,61,232,0.08);border:1px solid rgba(108,61,232,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
         <p style="font-size:13px;color:#a78bfa;margin:0;line-height:1.6;">💡 <strong>What's next?</strong> This funded account has reached its lifetime profit cap. Purchase a new challenge to continue trading.</p>
       </div>
@@ -412,7 +404,7 @@ app.post('/notify-payout', async (req, res) => {
   }
 });
 
-// ── LEADERBOARD — only shows paid out traders ──
+// ── LEADERBOARD ──
 app.get('/leaderboard', async (req, res) => {
   try {
     const { data: accounts } = await supabase
@@ -460,7 +452,7 @@ app.get('/leaderboard', async (req, res) => {
 // Check payments every 2 minutes
 cron.schedule('*/2 * * * *', checkPendingPayments);
 
-// Reset daily loss at midnight UTC every day
+// Reset daily loss at midnight UTC
 cron.schedule('0 0 * * *', async function() {
   console.log('Resetting daily loss for all active accounts...');
   try {
