@@ -14,7 +14,6 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ── Email to admin ──
 async function sendEmail(subject, text) {
   try {
     await resend.emails.send({
@@ -29,7 +28,6 @@ async function sendEmail(subject, text) {
   }
 }
 
-// ── Email to trader ──
 async function sendTraderEmail(toEmail, subject, html) {
   try {
     await resend.emails.send({
@@ -43,8 +41,6 @@ async function sendTraderEmail(toEmail, subject, html) {
     console.log('Trader email error:', e.message);
   }
 }
-
-// ── EMAIL TEMPLATES ──
 
 function emailFooter() {
   return `
@@ -102,8 +98,8 @@ function challengeFailedEmail(traderName, accId, reason) {
   return emailWrapper(`
     <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(240,61,61,0.2);">
       <div style="font-size:28px;margin-bottom:8px;">❌</div>
-      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#f03d3d;">Challenge Failed</h1>
-      <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Your Fortiq Funded evaluation has ended</p>
+      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#f03d3d;">Account Failed</h1>
+      <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Your trading account has been closed</p>
     </div>
     <div style="padding:32px;">
       <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
@@ -115,10 +111,8 @@ function challengeFailedEmail(traderName, accId, reason) {
       </div>
       <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
         <p style="font-size:13px;color:#7a7a9a;margin:0 0 12px;font-weight:600;">Quick reminder of the rules:</p>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:12px;">Profit Target (Stage 1)</span><span style="color:#e8e6ff;font-size:12px;">8% ($400)</span></div>
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:12px;">Daily Loss Limit</span><span style="color:#e8e6ff;font-size:12px;">5% max ($250)</span></div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:12px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:12px;">8% max ($400)</span></div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:12px;">Min Active Days</span><span style="color:#e8e6ff;font-size:12px;">5 days</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:12px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:12px;">8% max ($400)</span></div>
       </div>
       <div style="text-align:center;margin-bottom:24px;">
         <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Try Again — $150</a>
@@ -137,18 +131,18 @@ function stage2ActivatedEmail(traderName, accId) {
     <div style="padding:32px;">
       <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
       <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
-        Congratulations on passing the challenge! Your funded account is now active. Trade freely and keep <strong style="color:#c9a84c;">80% of every dollar you earn</strong>.
+        Congratulations on passing the challenge! Your funded account is now active. Trade freely and keep <strong style="color:#c9a84c;">80% of every dollar you earn</strong>. Request a payout whenever you are ready from your dashboard.
       </p>
       <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Funded Account ID</span><span style="color:#c9a84c;font-family:monospace;font-size:13px;">${accId}</span></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account Size</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">$5,000 USDT</span></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Profit Split</span><span style="color:#c9a84c;font-size:13px;font-weight:600;">80% Yours</span></div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Max Payout</span><span style="color:#c9a84c;font-size:13px;font-weight:600;">$4,000 USDT</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Max Account Profit</span><span style="color:#c9a84c;font-size:13px;font-weight:600;">$5,000 USDT</span></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Daily Loss Limit</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5% ($250)</span></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div>
       </div>
       <div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
-        <p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">💰 Trade freely — take profits whenever you like. Once your total profit reaches <strong>$5,000</strong>, your account closes automatically and you receive <strong>$4,000 USDT</strong> paid to your wallet every Saturday.</p>
+        <p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">💰 Trade freely — take profits whenever you like and request a payout from your dashboard at any time. Payouts are processed every Saturday in USDT TRC20.</p>
       </div>
       <div style="text-align:center;margin-bottom:24px;">
         <a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Start Trading Now →</a>
@@ -157,39 +151,10 @@ function stage2ActivatedEmail(traderName, accId) {
     </div>`);
 }
 
-function stage2CapReachedEmail(traderName, accId) {
-  return emailWrapper(`
-    <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
-      <div style="font-size:28px;margin-bottom:8px;">🎉</div>
-      <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;margin:0;color:#c9a84c;">Profit Cap Reached!</h1>
-      <p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Your funded account has hit the maximum profit</p>
-    </div>
-    <div style="padding:32px;">
-      <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
-      <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
-        Amazing work! Your funded account <strong style="color:#e8e6ff;">${accId}</strong> has reached the $5,000 profit cap. Your account has been closed and your payout is being processed.
-      </p>
-      <div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
-        <p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">💰 Your payout of <strong>$4,000 USDT</strong> (80% of $5,000) will be sent to your registered wallet every Saturday. Log in to your dashboard to submit your payout wallet if you haven't already.</p>
-      </div>
-      <div style="text-align:center;margin-bottom:24px;">
-        <a href="https://fortiqfunded.com/dashboard.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Claim Your Payout →</a>
-      </div>
-      <div style="text-align:center;">
-        <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge</a>
-      </div>
-    </div>`);
-}
-
 async function checkPendingPayments() {
   console.log('Checking pending payments...');
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('status', 'pending');
-
+  const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending');
   if (!payments || payments.length === 0) return;
-
   for (const payment of payments) {
     try {
       const res = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash);
@@ -206,7 +171,7 @@ async function checkPendingPayments() {
       if (amount < 148) {
         console.log('Amount too low:', amount);
         await supabase.from('payments').update({ status: 'insufficient' }).eq('id', payment.id);
-        await sendEmail('Payment Below Minimum — Fortiq Funded', 'A payment was received but was below the $148 minimum.\n\nTX Hash: ' + payment.tx_hash + '\nAmount: $' + amount + ' USDT\nUser ID: ' + payment.user_id);
+        await sendEmail('Payment Below Minimum — Fortiq Funded', 'TX Hash: ' + payment.tx_hash + '\nAmount: $' + amount + ' USDT\nUser ID: ' + payment.user_id);
         continue;
       }
       if (confirmations >= 19) await activateChallenge(payment);
@@ -235,11 +200,10 @@ async function activateChallenge(payment) {
   }, { onConflict: 'account_id' });
   await supabase.from('payments').update({ status: 'confirmed', account_id: accId }).eq('id', payment.id);
   console.log('Challenge activated:', accId);
-  await sendEmail('New Challenge Activated — Fortiq Funded', 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nUser ID: ' + profile.user_id + '\nAccount ID: ' + accId + '\nAmount Paid: $' + payment.amount + ' USDT\nTX Hash: ' + payment.tx_hash);
+  await sendEmail('New Challenge Activated — Fortiq Funded', 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nAccount ID: ' + accId + '\nAmount: $' + payment.amount + ' USDT');
   await sendTraderEmail(profile.email, '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId, challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2)));
 }
 
-// ── CHECK PENDING LIMIT ORDERS ──
 async function checkPendingLimitOrders() {
   try {
     const { data: orders } = await supabase.from('orders').select('*').eq('status', 'pending');
@@ -258,7 +222,12 @@ async function checkPendingLimitOrders() {
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
         if (!account || account.status !== 'active') { await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id); continue; }
         if (parseFloat(order.amount) > parseFloat(account.balance)) { await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id); continue; }
-        const pos = { user_id: order.user_id, account_id: order.account_id, symbol: order.symbol, direction: order.direction, amount: order.amount, leverage: order.leverage, entry_price: limitPrice, size: parseFloat(order.amount) * parseFloat(order.leverage), status: 'open', opened_at: new Date().toISOString() };
+        const pos = {
+          user_id: order.user_id, account_id: order.account_id, symbol: order.symbol,
+          direction: order.direction, amount: order.amount, leverage: order.leverage,
+          entry_price: limitPrice, size: parseFloat(order.amount) * parseFloat(order.leverage),
+          status: 'open', opened_at: new Date().toISOString()
+        };
         if (order.take_profit) pos.take_profit = order.take_profit;
         if (order.stop_loss) pos.stop_loss = order.stop_loss;
         await supabase.from('positions').insert(pos);
@@ -278,21 +247,14 @@ async function checkPendingLimitOrders() {
 // ── CREATE STAGE 2 ACCOUNT ──
 app.post('/create-stage2', async (req, res) => {
   const { stage1_account_id, user_id } = req.body;
-  if (!stage1_account_id || !user_id) {
-    return res.status(400).json({ error: 'Missing stage1_account_id or user_id' });
-  }
+  if (!stage1_account_id || !user_id) return res.status(400).json({ error: 'Missing fields' });
   try {
     const { data: profile } = await supabase.from('profiles').select('user_id, full_name, email').eq('id', user_id).single();
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
-
     const userNum = profile.user_id.replace('USR-', '');
     const stage2AccId = 'FND-' + userNum;
-
-    // Check if stage 2 already exists
     const { data: existing } = await supabase.from('accounts').select('account_id').eq('account_id', stage2AccId).single();
     if (existing) return res.json({ success: true, stage2_account_id: stage2AccId, message: 'Already exists' });
-
-    // Create stage 2 account
     await supabase.from('accounts').insert({
       user_id: user_id,
       account_id: stage2AccId,
@@ -305,26 +267,9 @@ app.post('/create-stage2', async (req, res) => {
       max_drawdown: 0,
       active_days: 0
     });
-
-    // Link stage 1 to stage 2
-    await supabase.from('accounts').update({
-      status: 'funded',
-      stage2_account_id: stage2AccId
-    }).eq('account_id', stage1_account_id);
-
-    // Send email to trader
-    await sendTraderEmail(
-      profile.email,
-      '🏆 You Are Now a Funded Trader — ' + stage2AccId,
-      stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId)
-    );
-
-    // Notify admin
-    await sendEmail(
-      'Stage 2 Funded Account Created — ' + stage2AccId,
-      'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + stage1_account_id + '\nStage 2: ' + stage2AccId
-    );
-
+    await supabase.from('accounts').update({ status: 'funded', stage2_account_id: stage2AccId }).eq('account_id', stage1_account_id);
+    await sendTraderEmail(profile.email, '🏆 You Are Now a Funded Trader — ' + stage2AccId, stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId));
+    await sendEmail('Stage 2 Funded Account Created — ' + stage2AccId, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + stage1_account_id + '\nStage 2: ' + stage2AccId);
     console.log('Stage 2 account created:', stage2AccId);
     res.json({ success: true, stage2_account_id: stage2AccId });
   } catch (err) {
@@ -333,39 +278,18 @@ app.post('/create-stage2', async (req, res) => {
   }
 });
 
-// ── STAGE 2 PROFIT CAP REACHED ──
-app.post('/stage2-cap', async (req, res) => {
-  const { account_id, user_id } = req.body;
-  if (!account_id || !user_id) return res.status(400).json({ error: 'Missing fields' });
-  try {
-    // Mark account as funded/paid out pending
-    await supabase.from('accounts').update({ status: 'funded', profit: 5000 }).eq('account_id', account_id);
-    const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', user_id).single();
-    if (profile) {
-      await sendTraderEmail(profile.email, '🎉 Profit Cap Reached — $4,000 Payout Coming! — ' + account_id, stage2CapReachedEmail(profile.full_name || 'Trader', account_id));
-      await sendEmail('Stage 2 Cap Reached — ' + account_id, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nAccount: ' + account_id + '\nPayout due: $4,000 USDT');
-    }
-    res.json({ success: true });
-  } catch (err) {
-    console.log('stage2-cap error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ── NOTIFY ACCOUNT STATUS CHANGE ──
 app.post('/notify-status', async (req, res) => {
   const { account_id, status, reason } = req.body;
-  if (!account_id || !status) return res.status(400).json({ error: 'Missing account_id or status' });
+  if (!account_id || !status) return res.status(400).json({ error: 'Missing fields' });
   try {
     const { data: account } = await supabase.from('accounts').select('user_id, profit').eq('account_id', account_id).single();
     if (!account) return res.status(404).json({ error: 'Account not found' });
     const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', account.user_id).single();
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
-    const traderName = profile.full_name || 'Trader';
-    const traderEmail = profile.email;
     if (status === 'failed') {
-      await sendTraderEmail(traderEmail, '❌ Your Fortiq Funded Account Has Failed — ' + account_id, challengeFailedEmail(traderName, account_id, reason || ''));
-      await sendEmail('Account Failed — ' + account_id, 'Account ' + account_id + ' has failed.\nTrader: ' + traderName + '\nEmail: ' + traderEmail + (reason ? '\nReason: ' + reason : ''));
+      await sendTraderEmail(profile.email, '❌ Your Fortiq Funded Account Has Failed — ' + account_id, challengeFailedEmail(profile.full_name || 'Trader', account_id, reason || ''));
+      await sendEmail('Account Failed — ' + account_id, 'Account ' + account_id + ' failed.\nTrader: ' + profile.full_name + '\nEmail: ' + profile.email + (reason ? '\nReason: ' + reason : ''));
     }
     res.json({ success: true });
   } catch (err) {
@@ -382,15 +306,15 @@ app.post('/admin-login', (req, res) => {
   return res.status(401).json({ success: false, error: 'Incorrect password' });
 });
 
-// ── PAYOUT NOTIFICATION ENDPOINT ──
+// ── PAYOUT NOTIFICATION ──
 app.post('/notify-payout', async (req, res) => {
   const { account_id, payout_amount, wallet_address } = req.body;
   if (!account_id || !payout_amount || !wallet_address) return res.status(400).json({ error: 'Missing required fields' });
   try {
     const { data: account } = await supabase.from('accounts').select('user_id, profit').eq('account_id', account_id).single();
     if (!account) return res.status(404).json({ error: 'Account not found' });
-    const { data: profile } = await supabase.from('profiles').select('full_name, email, user_id').eq('id', account.user_id).single();
-    if (!profile) return res.status(404).json({ error: 'Trader profile not found' });
+    const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', account.user_id).single();
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
     const traderName = profile.full_name || 'Trader';
     const traderEmail = profile.email;
     const totalProfit = parseFloat(account.profit || 0).toFixed(2);
@@ -411,11 +335,11 @@ app.post('/notify-payout', async (req, res) => {
         <div style="padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet Address</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">${wallet_address}</span></div>
       </div>
       <div style="text-align:center;margin-bottom:24px;">
-        <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge</a>
+        <a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Continue Trading</a>
       </div>
     </div>`);
     await sendTraderEmail(traderEmail, '🎉 Your Fortiq Funded Payout Has Been Sent — $' + payout_amount + ' USDT', traderHtml);
-    await sendEmail('Payout Processed — ' + account_id, 'Account: ' + account_id + '\nTrader: ' + traderName + '\nEmail: ' + traderEmail + '\nAmount: $' + payout_amount + ' USDT\nWallet: ' + wallet_address);
+    await sendEmail('Payout Processed — ' + account_id, 'Account: ' + account_id + '\nTrader: ' + traderName + '\nEmail: ' + traderEmail + '\nAmount: $' + payout_amount + ' USDT\nWallet: ' + wallet_address + '\nTotal Profit: $' + totalProfit + ' USDT');
     res.json({ success: true });
   } catch (err) {
     console.log('Payout notification error:', err.message);
@@ -433,7 +357,16 @@ app.get('/leaderboard', async (req, res) => {
       const name = profile ? profile.full_name : 'Anonymous Trader';
       const firstName = name.split(' ')[0];
       const lastInitial = name.split(' ')[1] ? name.split(' ')[1][0] + '.' : '';
-      return { rank: index + 1, name: firstName + (lastInitial ? ' ' + lastInitial : ''), account_id: acc.account_id, profit: parseFloat(acc.profit || 0).toFixed(2), payout: parseFloat(acc.payout_amount || 0).toFixed(2), profit_pct: ((parseFloat(acc.profit || 0) / 5000) * 100).toFixed(2), active_days: acc.active_days || 0, status: acc.status };
+      return {
+        rank: index + 1,
+        name: firstName + (lastInitial ? ' ' + lastInitial : ''),
+        account_id: acc.account_id,
+        profit: parseFloat(acc.profit || 0).toFixed(2),
+        payout: parseFloat(acc.payout_amount || 0).toFixed(2),
+        profit_pct: ((parseFloat(acc.profit || 0) / 5000) * 100).toFixed(2),
+        active_days: acc.active_days || 0,
+        status: acc.status
+      };
     }));
     res.json({ leaderboard });
   } catch (err) {
@@ -461,7 +394,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // ── REFERRAL TRACKING ──
 app.post('/track-referral', async (req, res) => {
   const { referrer_code, referred_user_id } = req.body;
-  if (!referrer_code || !referred_user_id) return res.status(400).json({ error: 'Missing referrer_code or referred_user_id' });
+  if (!referrer_code || !referred_user_id) return res.status(400).json({ error: 'Missing fields' });
   try {
     const { data: referrer } = await supabase.from('profiles').select('user_id').or('user_id.eq.' + referrer_code + ',referral_code.eq.' + referrer_code).single();
     if (!referrer) return res.status(404).json({ error: 'Referrer not found' });
