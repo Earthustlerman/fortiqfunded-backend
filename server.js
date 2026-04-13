@@ -258,6 +258,93 @@ async function activateChallenge(payment) {
   );
 }
 
+// ── CHECK PENDING LIMIT ORDERS ──
+async function checkPendingLimitOrders() {
+  try {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('status', 'pending');
+
+    if (!orders || orders.length === 0) return;
+
+    for (const order of orders) {
+      try {
+        // Get current price from Binance
+        const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + order.symbol);
+        const data = await res.json();
+        const currentPrice = parseFloat(data.price);
+        if (!currentPrice) continue;
+
+        const limitPrice = parseFloat(order.limit_price);
+        let shouldExecute = false;
+
+        // For a buy/long limit order: execute when price drops to or below limit price
+        if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
+        // For a sell/short limit order: execute when price rises to or above limit price
+        if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
+
+        if (!shouldExecute) continue;
+
+        // Load the account
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('*')
+          .eq('account_id', order.account_id)
+          .single();
+
+        if (!account || account.status !== 'active') {
+          await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id);
+          continue;
+        }
+
+        if (parseFloat(order.amount) > parseFloat(account.balance)) {
+          await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id);
+          continue;
+        }
+
+        // Execute the order — create a position
+        const pos = {
+          user_id: order.user_id,
+          account_id: order.account_id,
+          symbol: order.symbol,
+          direction: order.direction,
+          amount: order.amount,
+          leverage: order.leverage,
+          entry_price: limitPrice,
+          size: parseFloat(order.amount) * parseFloat(order.leverage),
+          status: 'open',
+          opened_at: new Date().toISOString()
+        };
+        if (order.take_profit) pos.take_profit = order.take_profit;
+        if (order.stop_loss) pos.stop_loss = order.stop_loss;
+
+        await supabase.from('positions').insert(pos);
+
+        // Deduct balance and set account active
+        const newBalance = parseFloat(account.balance) - parseFloat(order.amount);
+        await supabase.from('accounts').update({
+          balance: newBalance,
+          status: 'active'
+        }).eq('account_id', order.account_id);
+
+        // Mark order as executed
+        await supabase.from('orders').update({
+          status: 'executed',
+          executed_at: new Date().toISOString()
+        }).eq('id', order.id);
+
+        console.log('Limit order executed:', order.id, order.symbol, order.direction, '@', limitPrice);
+
+      } catch (err) {
+        console.log('Error processing limit order:', order.id, err.message);
+      }
+    }
+  } catch (err) {
+    console.log('checkPendingLimitOrders error:', err.message);
+  }
+}
+
 // ── NOTIFY ACCOUNT STATUS CHANGE ──
 app.post('/notify-status', async (req, res) => {
   const { account_id, status, reason } = req.body;
@@ -449,8 +536,13 @@ app.get('/leaderboard', async (req, res) => {
   }
 });
 
+// ── CRON JOBS ──
+
 // Check payments every 2 minutes
 cron.schedule('*/2 * * * *', checkPendingPayments);
+
+// Check pending limit orders every 30 seconds
+cron.schedule('*/30 * * * * *', checkPendingLimitOrders);
 
 // Reset daily loss at midnight UTC
 cron.schedule('0 0 * * *', async function() {
