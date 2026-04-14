@@ -26,6 +26,7 @@ const supabase = createClient(
 );
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const TRONGRID_KEY = process.env.TRONGRID_API_KEY;
 
 async function sendEmail(subject, text) {
   try {
@@ -170,9 +171,17 @@ async function checkPendingPayments() {
   if (!payments || payments.length === 0) return;
   for (const payment of payments) {
     try {
-      const res = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash);
+      // ── Use TronGrid API key for reliable blockchain access ──
+      const res = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash, {
+        headers: {
+          'TRON-PRO-API-KEY': TRONGRID_KEY
+        }
+      });
       const data = await res.json();
-      if (!data.data || data.data.length === 0) continue;
+      if (!data.data || data.data.length === 0) {
+        console.log('TX not found yet:', payment.tx_hash);
+        continue;
+      }
       const tx = data.data[0];
       const confirmations = tx.confirmations || 0;
       let amount = 0;
@@ -199,6 +208,13 @@ async function activateChallenge(payment) {
   if (!profile) return;
   const userNum = profile.user_id.replace('USR-', '');
   const accId = 'ACC-' + userNum;
+  // Check if already activated to prevent duplicate activation
+  const { data: existing } = await supabase.from('accounts').select('account_id, status').eq('account_id', accId).single();
+  if (existing && existing.status === 'active') {
+    console.log('Account already active:', accId);
+    await supabase.from('payments').update({ status: 'confirmed', account_id: accId }).eq('id', payment.id);
+    return;
+  }
   await supabase.from('accounts').upsert({
     user_id: payment.user_id,
     account_id: accId,
@@ -275,7 +291,6 @@ app.post('/close-position', async (req, res) => {
     if (!exitPrice || isNaN(exitPrice)) return res.status(500).json({ error: 'Could not fetch current price' });
     const entryPrice = parseFloat(position.entry_price);
     const amount = parseFloat(position.amount);
-    const leverage = parseFloat(position.leverage);
     const size = parseFloat(position.size);
     let priceDiff = 0;
     if (position.direction === 'long') {
