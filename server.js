@@ -244,6 +244,175 @@ async function checkPendingLimitOrders() {
   }
 }
 
+// ── CLOSE POSITION (SECURE SERVER-SIDE P&L CALCULATION) ──
+app.post('/close-position', async (req, res) => {
+  const { position_id, account_id, user_id } = req.body;
+  if (!position_id || !account_id || !user_id) return res.status(400).json({ error: 'Missing fields' });
+
+  try {
+    // 1. Fetch position from DB using service key — browser cannot manipulate this
+    const { data: position, error: posErr } = await supabase
+      .from('positions').select('*').eq('id', position_id).eq('account_id', account_id).eq('user_id', user_id).eq('status', 'open').single();
+    if (posErr || !position) return res.status(404).json({ error: 'Position not found or already closed' });
+
+    // 2. Fetch account from DB using service key
+    const { data: account, error: accErr } = await supabase
+      .from('accounts').select('*').eq('account_id', account_id).eq('status', 'active').single();
+    if (accErr || !account) return res.status(404).json({ error: 'Account not found or not active' });
+
+    // 3. Verify this user owns this account — security check
+    if (account.user_id !== user_id) return res.status(403).json({ error: 'Unauthorised' });
+
+    // 4. Fetch REAL current price from Binance — browser cannot fake this
+    const priceRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + position.symbol);
+    const priceData = await priceRes.json();
+    const exitPrice = parseFloat(priceData.price);
+    if (!exitPrice || isNaN(exitPrice)) return res.status(500).json({ error: 'Could not fetch current price' });
+
+    // 5. Calculate P&L server-side using real data
+    const entryPrice = parseFloat(position.entry_price);
+    const amount = parseFloat(position.amount);
+    const leverage = parseFloat(position.leverage);
+    const size = parseFloat(position.size); // amount * leverage
+
+    let priceDiff = 0;
+    if (position.direction === 'long') {
+      priceDiff = (exitPrice - entryPrice) / entryPrice;
+    } else {
+      priceDiff = (entryPrice - exitPrice) / entryPrice;
+    }
+
+    let rawPnl = priceDiff * size;
+
+    // 6. Cap loss at margin amount for isolated margin (cannot lose more than you put in)
+    const maxLoss = -amount;
+    if (rawPnl < maxLoss) rawPnl = maxLoss;
+
+    const pnl = parseFloat(rawPnl.toFixed(2));
+    const returnedMargin = amount + pnl; // margin returned to balance (could be 0 if liquidated)
+    const safeReturnedMargin = Math.max(0, returnedMargin);
+
+    // 7. Calculate new account values
+    const currentBalance = parseFloat(account.balance);
+    const currentProfit = parseFloat(account.profit || 0);
+    const currentDailyLoss = parseFloat(account.daily_loss || 0);
+    const currentMaxDrawdown = parseFloat(account.max_drawdown || 0);
+
+    const newBalance = parseFloat((currentBalance + safeReturnedMargin).toFixed(2));
+    const newProfit = parseFloat((currentProfit + pnl).toFixed(2));
+
+    // Daily loss — only track losses
+    let newDailyLoss = currentDailyLoss;
+    if (pnl < 0) {
+      const lossPercent = (Math.abs(pnl) / 5000) * 100;
+      newDailyLoss = parseFloat((currentDailyLoss + lossPercent).toFixed(4));
+    }
+
+    // Max drawdown — highest cumulative loss from starting balance
+    const drawdownFromStart = ((5000 - newBalance) / 5000) * 100;
+    const newMaxDrawdown = parseFloat(Math.max(currentMaxDrawdown, Math.max(0, drawdownFromStart)).toFixed(4));
+
+    // 8. Check rule breaches
+    const dailyLimitBreached = newDailyLoss >= 5;
+    const drawdownBreached = newMaxDrawdown >= 8;
+    const ruleBreached = dailyLimitBreached || drawdownBreached;
+
+    // 9. Check Stage 1 pass conditions
+    const stage = account.stage || 1;
+    const activeDays = account.active_days || 0;
+    const stage1Passed = stage === 1 && newProfit >= 400 && activeDays >= 5 && !ruleBreached;
+
+    // 10. Check Stage 2 profit cap
+    const stage2CapHit = stage === 2 && newProfit >= 5000;
+
+    // 11. Close the position in DB
+    await supabase.from('positions').update({
+      status: 'closed',
+      exit_price: exitPrice,
+      pnl: pnl,
+      closed_at: new Date().toISOString()
+    }).eq('id', position_id);
+
+    // 12. Update account
+    if (ruleBreached) {
+      // Fail the account
+      await supabase.from('accounts').update({
+        balance: newBalance,
+        profit: newProfit,
+        daily_loss: newDailyLoss,
+        max_drawdown: newMaxDrawdown,
+        status: 'failed'
+      }).eq('account_id', account_id);
+
+      // Send failed email
+      const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', user_id).single();
+      if (profile) {
+        const reason = dailyLimitBreached ? 'Daily loss limit of 5% exceeded' : 'Maximum drawdown of 8% exceeded';
+        await sendTraderEmail(profile.email, '❌ Your Fortiq Funded Account Has Failed — ' + account_id, challengeFailedEmail(profile.full_name || 'Trader', account_id, reason));
+        await sendEmail('Account Auto-Failed — ' + account_id, 'Account: ' + account_id + '\nTrader: ' + profile.full_name + '\nReason: ' + reason);
+      }
+
+      console.log('Account failed after position close:', account_id, 'Daily loss:', newDailyLoss, 'Drawdown:', newMaxDrawdown);
+      return res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, accountFailed: true, reason: dailyLimitBreached ? 'daily_loss' : 'drawdown' });
+    }
+
+    // Normal update
+    await supabase.from('accounts').update({
+      balance: newBalance,
+      profit: newProfit,
+      daily_loss: newDailyLoss,
+      max_drawdown: newMaxDrawdown
+    }).eq('account_id', account_id);
+
+    console.log('Position closed server-side:', position_id, '| P&L:', pnl, '| Exit:', exitPrice);
+
+    // 13. If Stage 1 passed — trigger Stage 2 creation
+    if (stage1Passed) {
+      console.log('Stage 1 passed! Creating Stage 2 for:', account_id);
+      try {
+        const { data: profile } = await supabase.from('profiles').select('user_id, full_name, email').eq('id', user_id).single();
+        if (profile) {
+          const userNum = profile.user_id.replace('USR-', '');
+          const stage2AccId = 'FND-' + userNum;
+          const { data: existing } = await supabase.from('accounts').select('account_id').eq('account_id', stage2AccId).single();
+          if (!existing) {
+            await supabase.from('accounts').insert({
+              user_id: user_id,
+              account_id: stage2AccId,
+              account_type: 'funded',
+              status: 'active',
+              stage: 2,
+              balance: 5000,
+              profit: 0,
+              daily_loss: 0,
+              max_drawdown: 0,
+              active_days: 0
+            });
+            await supabase.from('accounts').update({ status: 'funded', stage2_account_id: stage2AccId }).eq('account_id', account_id);
+            await sendTraderEmail(profile.email, '🏆 You Are Now a Funded Trader — ' + stage2AccId, stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId));
+            await sendEmail('Stage 2 Auto-Created — ' + stage2AccId, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + account_id + '\nStage 2: ' + stage2AccId);
+          }
+          return res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, stage1Passed: true, stage2AccountId: stage2AccId });
+        }
+      } catch (s2err) {
+        console.log('Stage 2 creation error:', s2err.message);
+      }
+    }
+
+    // 14. If Stage 2 profit cap hit
+    if (stage2CapHit) {
+      console.log('Stage 2 profit cap hit for:', account_id);
+      return res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, stage2CapHit: true });
+    }
+
+    res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, accountFailed: false, stage1Passed: false });
+
+  } catch (err) {
+    console.log('close-position error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── CREATE STAGE 2 ACCOUNT ──
 app.post('/create-stage2', async (req, res) => {
   const { stage1_account_id, user_id } = req.body;
@@ -335,7 +504,7 @@ app.post('/notify-payout', async (req, res) => {
         <div style="padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet Address</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">${wallet_address}</span></div>
       </div>
       <div style="text-align:center;margin-bottom:24px;">
-        <a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Continue Trading</a>
+        <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge →</a>
       </div>
     </div>`);
     await sendTraderEmail(traderEmail, '🎉 Your Fortiq Funded Payout Has Been Sent — $' + payout_amount + ' USDT', traderHtml);
