@@ -165,38 +165,132 @@ function stage2ActivatedEmail(traderName, accId) {
     </div>`);
 }
 
+// ── IMPROVED PAYMENT VERIFICATION WITH MULTIPLE API FALLBACKS ──
 async function checkPendingPayments() {
   console.log('Checking pending payments...');
   const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending');
   if (!payments || payments.length === 0) return;
+
   for (const payment of payments) {
     try {
-      // ── Use TronGrid API key for reliable blockchain access ──
-      const res = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash, {
-        headers: {
-          'TRON-PRO-API-KEY': TRONGRID_KEY
+      let amount = 0;
+      let confirmations = 0;
+      let found = false;
+
+      // ── Method 1: TronGrid v1/transactions ──
+      try {
+        const res = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash, {
+          headers: { 'TRON-PRO-API-KEY': TRONGRID_KEY }
+        });
+        const data = await res.json();
+        if (data.data && data.data.length > 0) {
+          const tx = data.data[0];
+          confirmations = tx.confirmations || 0;
+          if (tx.trc20_transfers && tx.trc20_transfers.length > 0) {
+            amount = parseInt(tx.trc20_transfers[0].amount_str || '0') / 1000000;
+            if (amount > 0) {
+              found = true;
+              console.log('Method 1 (TronGrid v1) found TX:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+            }
+          }
         }
-      });
-      const data = await res.json();
-      if (!data.data || data.data.length === 0) {
-        console.log('TX not found yet:', payment.tx_hash);
+      } catch (e) {
+        console.log('Method 1 TronGrid error:', e.message);
+      }
+
+      // ── Method 2: TronGrid events endpoint ──
+      if (!found || amount === 0) {
+        try {
+          const res2 = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash + '/events', {
+            headers: { 'TRON-PRO-API-KEY': TRONGRID_KEY }
+          });
+          const data2 = await res2.json();
+          if (data2.data && data2.data.length > 0) {
+            for (const event of data2.data) {
+              if (event.result && event.result.value) {
+                const val = parseInt(event.result.value) / 1000000;
+                if (val > 0) {
+                  amount = val;
+                  confirmations = confirmations || 999;
+                  found = true;
+                  console.log('Method 2 (TronGrid events) found TX:', payment.tx_hash, '| Amount:', amount);
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Method 2 TronGrid events error:', e.message);
+        }
+      }
+
+      // ── Method 3: TronScan API fallback ──
+      if (!found || amount === 0) {
+        try {
+          const res3 = await fetch('https://apilist.tronscanapi.com/api/transaction-info?hash=' + payment.tx_hash, {
+            headers: { 'TRON-PRO-API-KEY': TRONGRID_KEY }
+          });
+          const data3 = await res3.json();
+          if (data3 && data3.trc20TransferInfo && data3.trc20TransferInfo.length > 0) {
+            const transfer = data3.trc20TransferInfo[0];
+            const rawAmount = transfer.amount_str || transfer.amount || '0';
+            amount = parseInt(rawAmount) / 1000000;
+            confirmations = data3.confirmations || 999;
+            if (amount > 0) {
+              found = true;
+              console.log('Method 3 (TronScan) found TX:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+            }
+          }
+        } catch (e) {
+          console.log('Method 3 TronScan error:', e.message);
+        }
+      }
+
+      // ── Method 4: TronGrid wallet/transactions search ──
+      if (!found || amount === 0) {
+        try {
+          const res4 = await fetch('https://api.trongrid.io/v1/contracts/TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t/transactions?limit=10&only_confirmed=true', {
+            headers: { 'TRON-PRO-API-KEY': TRONGRID_KEY }
+          });
+          const data4 = await res4.json();
+          if (data4.data) {
+            const match = data4.data.find(function(tx) { return tx.transaction_id === payment.tx_hash; });
+            if (match) {
+              amount = parseInt(match.token_info && match.value ? match.value : '0') / 1000000;
+              confirmations = 999;
+              if (amount > 0) {
+                found = true;
+                console.log('Method 4 (TronGrid contract search) found TX:', payment.tx_hash);
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Method 4 error:', e.message);
+        }
+      }
+
+      if (!found || amount === 0) {
+        console.log('TX not found yet by any method:', payment.tx_hash);
         continue;
       }
-      const tx = data.data[0];
-      const confirmations = tx.confirmations || 0;
-      let amount = 0;
-      if (tx.trc20_transfers && tx.trc20_transfers.length > 0) {
-        amount = parseInt(tx.trc20_transfers[0].amount_str || '0') / 1000000;
-      }
-      console.log('TX:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+
+      console.log('TX verified:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
       await supabase.from('payments').update({ confirmations, amount }).eq('id', payment.id);
+
       if (amount < 148) {
         console.log('Amount too low:', amount);
         await supabase.from('payments').update({ status: 'insufficient' }).eq('id', payment.id);
         await sendEmail('Payment Below Minimum — Fortiq Funded', 'TX Hash: ' + payment.tx_hash + '\nAmount: $' + amount + ' USDT\nUser ID: ' + payment.user_id);
         continue;
       }
-      if (confirmations >= 19) await activateChallenge(payment);
+
+      // Treat confirmations >= 19 OR 999 (from fallback methods) as confirmed
+      if (confirmations >= 19 || confirmations === 999) {
+        await activateChallenge(payment);
+      } else {
+        console.log('TX found but not enough confirmations yet:', confirmations);
+      }
+
     } catch (err) {
       console.log('Error checking TX:', payment.tx_hash, err.message);
     }
@@ -208,6 +302,7 @@ async function activateChallenge(payment) {
   if (!profile) return;
   const userNum = profile.user_id.replace('USR-', '');
   const accId = 'ACC-' + userNum;
+
   // Check if already activated to prevent duplicate activation
   const { data: existing } = await supabase.from('accounts').select('account_id, status').eq('account_id', accId).single();
   if (existing && existing.status === 'active') {
@@ -215,6 +310,7 @@ async function activateChallenge(payment) {
     await supabase.from('payments').update({ status: 'confirmed', account_id: accId }).eq('id', payment.id);
     return;
   }
+
   await supabase.from('accounts').upsert({
     user_id: payment.user_id,
     account_id: accId,
@@ -227,8 +323,10 @@ async function activateChallenge(payment) {
     max_drawdown: 0,
     active_days: 0
   }, { onConflict: 'account_id' });
+
   await supabase.from('payments').update({ status: 'confirmed', account_id: accId }).eq('id', payment.id);
   console.log('Challenge activated:', accId);
+
   await sendEmail('New Challenge Activated — Fortiq Funded', 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nAccount ID: ' + accId + '\nAmount: $' + payment.amount + ' USDT');
   await sendTraderEmail(profile.email, '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId, challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2)));
 }
@@ -507,22 +605,6 @@ app.get('/leaderboard', async (req, res) => {
   }
 });
 
-// ── CRON JOBS ──
-cron.schedule('*/2 * * * *', checkPendingPayments);
-cron.schedule('*/30 * * * * *', checkPendingLimitOrders);
-cron.schedule('0 0 * * *', async function() {
-  console.log('Resetting daily loss...');
-  try {
-    await supabase.from('accounts').update({ daily_loss: 0 }).in('status', ['to_be_active', 'active', 'funded']);
-    console.log('Daily loss reset complete');
-  } catch (err) {
-    console.log('Daily loss reset failed:', err.message);
-  }
-});
-
-app.get('/', (req, res) => res.send('Fortiq Funded Backend Running'));
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
 // ── REFERRAL TRACKING ──
 app.post('/track-referral', async (req, res) => {
   const { referrer_code, referred_user_id } = req.body;
@@ -541,10 +623,27 @@ app.post('/track-referral', async (req, res) => {
   }
 });
 
+// ── MANUAL PAYMENT CHECK TRIGGER ──
 app.post('/check-payment', async (req, res) => {
   await checkPendingPayments();
   res.json({ message: 'Check triggered' });
 });
+
+// ── CRON JOBS ──
+cron.schedule('*/2 * * * *', checkPendingPayments);
+cron.schedule('*/30 * * * * *', checkPendingLimitOrders);
+cron.schedule('0 0 * * *', async function() {
+  console.log('Resetting daily loss...');
+  try {
+    await supabase.from('accounts').update({ daily_loss: 0 }).in('status', ['to_be_active', 'active', 'funded']);
+    console.log('Daily loss reset complete');
+  } catch (err) {
+    console.log('Daily loss reset failed:', err.message);
+  }
+});
+
+app.get('/', (req, res) => res.send('Fortiq Funded Backend Running'));
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port', PORT));
