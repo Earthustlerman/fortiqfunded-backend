@@ -312,7 +312,7 @@ async function activateChallenge(payment) {
   }
 
   await supabase.from('accounts').upsert({
-    user_id: payment.user_id,
+    user_id: profile.user_id,
     account_id: accId,
     account_type: 'challenge',
     status: 'active',
