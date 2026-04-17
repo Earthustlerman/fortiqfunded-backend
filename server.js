@@ -312,7 +312,7 @@ async function activateChallenge(payment) {
   }
 
   await supabase.from('accounts').upsert({
-    user_id: profile.user_id,
+    user_id: payment.user_id,
     account_id: accId,
     account_type: 'challenge',
     status: 'active',
@@ -338,9 +338,22 @@ async function checkPendingLimitOrders() {
     if (!orders || orders.length === 0) return;
     for (const order of orders) {
       try {
-        const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + order.symbol);
-        const data = await res.json();
-        const currentPrice = parseFloat(data.price);
+        // ── Fetch price with fallbacks ──
+        let currentPrice = null;
+        try {
+          const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + order.symbol);
+          const data = await res.json();
+          if (data.price) currentPrice = parseFloat(data.price);
+        } catch(e) { console.log('Binance price error for limit order:', e.message); }
+
+        if (!currentPrice) {
+          try {
+            const res2 = await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol=' + order.symbol);
+            const data2 = await res2.json();
+            if (data2.price) currentPrice = parseFloat(data2.price);
+          } catch(e) { console.log('Binance futures price error:', e.message); }
+        }
+
         if (!currentPrice) continue;
         const limitPrice = parseFloat(order.limit_price);
         let shouldExecute = false;
@@ -384,10 +397,62 @@ app.post('/close-position', async (req, res) => {
       .from('accounts').select('*').eq('account_id', account_id).eq('status', 'active').single();
     if (accErr || !account) return res.status(404).json({ error: 'Account not found or not active' });
     if (account.user_id !== user_id) return res.status(403).json({ error: 'Unauthorised' });
-    const priceRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + position.symbol);
-    const priceData = await priceRes.json();
-    const exitPrice = parseFloat(priceData.price);
-    if (!exitPrice || isNaN(exitPrice)) return res.status(500).json({ error: 'Could not fetch current price' });
+    // ── Fetch exit price with multiple fallbacks ──
+    let exitPrice = null;
+
+    // Method 1: Binance REST API
+    try {
+      const priceRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + position.symbol);
+      const priceData = await priceRes.json();
+      if (priceData.price) exitPrice = parseFloat(priceData.price);
+    } catch (e) {
+      console.log('Binance price fetch failed:', e.message);
+    }
+
+    // Method 2: Binance Futures API
+    if (!exitPrice || isNaN(exitPrice)) {
+      try {
+        const priceRes2 = await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol=' + position.symbol);
+        const priceData2 = await priceRes2.json();
+        if (priceData2.price) exitPrice = parseFloat(priceData2.price);
+      } catch (e) {
+        console.log('Binance futures price fetch failed:', e.message);
+      }
+    }
+
+    // Method 3: CoinGecko API
+    if (!exitPrice || isNaN(exitPrice)) {
+      try {
+        const coinMap = {'BTCUSDT':'bitcoin','ETHUSDT':'ethereum','BNBUSDT':'binancecoin','SOLUSDT':'solana','XRPUSDT':'ripple','ADAUSDT':'cardano','DOGEUSDT':'dogecoin','AVAXUSDT':'avalanche-2','DOTUSDT':'polkadot','LINKUSDT':'chainlink'};
+        const coinId = coinMap[position.symbol] || 'bitcoin';
+        const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=' + coinId + '&vs_currencies=usd');
+        const cgData = await cgRes.json();
+        if (cgData[coinId] && cgData[coinId].usd) exitPrice = parseFloat(cgData[coinId].usd);
+        console.log('CoinGecko fallback price:', exitPrice);
+      } catch (e) {
+        console.log('CoinGecko price fetch failed:', e.message);
+      }
+    }
+
+    // Method 4: Kraken API
+    if (!exitPrice || isNaN(exitPrice)) {
+      try {
+        const krakenMap = {'BTCUSDT':'XBTUSD','ETHUSDT':'ETHUSD','SOLUSDT':'SOLUSD','XRPUSDT':'XRPUSD','ADAUSDT':'ADAUSD','DOGEUSDT':'XDGUSD','DOTUSDT':'DOTUSD','LINKUSDT':'LINKUSD'};
+        const krakenPair = krakenMap[position.symbol];
+        if (krakenPair) {
+          const krakenRes = await fetch('https://api.kraken.com/0/public/Ticker?pair=' + krakenPair);
+          const krakenData = await krakenRes.json();
+          const pairs = Object.values(krakenData.result || {});
+          if (pairs.length > 0) exitPrice = parseFloat(pairs[0].c[0]);
+          console.log('Kraken fallback price:', exitPrice);
+        }
+      } catch (e) {
+        console.log('Kraken price fetch failed:', e.message);
+      }
+    }
+
+    if (!exitPrice || isNaN(exitPrice)) return res.status(500).json({ error: 'Could not fetch current price from any source' });
+    console.log('Exit price fetched:', exitPrice, 'for', position.symbol);
     const entryPrice = parseFloat(position.entry_price);
     const amount = parseFloat(position.amount);
     const size = parseFloat(position.size);
