@@ -334,6 +334,7 @@ async function activateChallenge(payment) {
 async function checkPendingLimitOrders() {
   try {
     const { data: orders } = await supabase.from('orders').select('*').eq('status', 'pending');
+    console.log('Checking limit orders... found:', orders ? orders.length : 0);
     if (!orders || orders.length === 0) return;
     for (const order of orders) {
       try {
