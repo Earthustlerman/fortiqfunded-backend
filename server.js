@@ -343,7 +343,11 @@ async function checkPendingLimitOrders() {
        let currentPrice = null;
 console.log('Fetching price for:', order.symbol);
         try {
-          const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + order.symbol);
+         try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3000);
+          const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + order.symbol, { signal: controller.signal });
+          clearTimeout(timeout);
           const data = await res.json();
           if (data.price) currentPrice = parseFloat(data.price);
         } catch(e) { console.log('Binance price error for limit order:', e.message); }
