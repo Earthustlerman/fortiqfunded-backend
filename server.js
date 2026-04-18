@@ -353,7 +353,20 @@ async function checkPendingLimitOrders() {
             if (data2.price) currentPrice = parseFloat(data2.price);
           } catch(e) { console.log('Binance futures price error:', e.message); }
         }
-
+// Kraken fallback
+        if (!currentPrice) {
+          try {
+            const krakenMap = {'BTCUSDT':'XBTUSD','ETHUSDT':'ETHUSD','SOLUSDT':'SOLUSD','XRPUSDT':'XRPUSD','ADAUSDT':'ADAUSD','DOGEUSDT':'XDGUSD','DOTUSDT':'DOTUSD','LINKUSDT':'LINKUSD'};
+            const krakenPair = krakenMap[order.symbol];
+            if (krakenPair) {
+              const kr = await fetch('https://api.kraken.com/0/public/Ticker?pair=' + krakenPair);
+              const kd = await kr.json();
+              const pairs = Object.values(kd.result || {});
+              if (pairs.length > 0) currentPrice = parseFloat(pairs[0].c[0]);
+              console.log('Kraken fallback price for limit order:', currentPrice);
+            }
+          } catch(e) { console.log('Kraken price error for limit order:', e.message); }
+        }
         if (!currentPrice) { console.log('Could not fetch price for limit order:', order.symbol); continue; }
         const limitPrice = parseFloat(order.limit_price);
         let shouldExecute = false;
