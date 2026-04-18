@@ -385,6 +385,53 @@ async function checkPendingLimitOrders() {
   }
 }
 
+// ── OPEN POSITION (SERVER-SIDE BALANCE DEDUCTION) ──
+app.post('/open-position', async (req, res) => {
+  const { user_id, account_id, symbol, direction, amount, leverage, entry_price, size, take_profit, stop_loss } = req.body;
+  if (!user_id || !account_id || !symbol || !direction || !amount || !entry_price) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    // Get account and verify ownership
+    const { data: account, error: accErr } = await supabase
+      .from('accounts').select('*').eq('account_id', account_id).eq('status', 'active').single();
+    if (accErr || !account) return res.status(404).json({ error: 'Account not found or not active' });
+    if (account.user_id !== user_id) return res.status(403).json({ error: 'Unauthorised' });
+
+    const amt = parseFloat(amount);
+    const currentBalance = parseFloat(account.balance);
+
+    // Check balance
+    if (amt > currentBalance) return res.status(400).json({ error: 'Amount exceeds available balance' });
+
+    // Check daily loss and drawdown limits
+    if (parseFloat(account.daily_loss || 0) >= 5) return res.status(400).json({ error: 'Daily loss limit reached' });
+    if (parseFloat(account.max_drawdown || 0) >= 8) return res.status(400).json({ error: 'Max drawdown reached' });
+
+    // Insert position
+    const pos = {
+      user_id, account_id, symbol, direction,
+      amount: amt, leverage: parseFloat(leverage) || 1,
+      entry_price: parseFloat(entry_price),
+      size: parseFloat(size) || amt * (parseFloat(leverage) || 1),
+      status: 'open', opened_at: new Date().toISOString()
+    };
+    if (take_profit) pos.take_profit = parseFloat(take_profit);
+    if (stop_loss) pos.stop_loss = parseFloat(stop_loss);
+
+    const { data: newPos, error: posErr } = await supabase.from('positions').insert(pos).select().single();
+    if (posErr) return res.status(500).json({ error: posErr.message });
+
+    // Deduct balance
+    const newBalance = parseFloat((currentBalance - amt).toFixed(2));
+    await supabase.from('accounts').update({ balance: newBalance, status: 'active' }).eq('account_id', account_id);
+
+    console.log('Position opened server-side:', newPos.id, '| Symbol:', symbol, '| Amount:', amt, '| New balance:', newBalance);
+    res.json({ success: true, position: newPos, newBalance });
+  } catch (err) {
+    console.log('open-position error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── CLOSE POSITION (SECURE SERVER-SIDE P&L CALCULATION) ──
 app.post('/close-position', async (req, res) => {
   const { position_id, account_id, user_id } = req.body;
@@ -488,13 +535,12 @@ app.post('/close-position', async (req, res) => {
     const activeDays = account.active_days || 0;
     const stage1Passed = stage === 1 && newProfit >= 400 && activeDays >= 5 && !ruleBreached;
     const stage2CapHit = stage === 2 && newProfit >= 5000;
-   const updateResult = await supabase.from('positions').update({
+    await supabase.from('positions').update({
       status: 'closed',
       exit_price: exitPrice,
       pnl: pnl,
       closed_at: new Date().toISOString()
     }).eq('id', position_id);
-    console.log('Position update result:', JSON.stringify(updateResult));
     if (ruleBreached) {
       await supabase.from('accounts').update({
         balance: newBalance, profit: newProfit, daily_loss: newDailyLoss,
