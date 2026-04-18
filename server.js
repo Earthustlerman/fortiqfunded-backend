@@ -338,6 +338,7 @@ async function checkPendingLimitOrders() {
     if (!orders || orders.length === 0) return;
     for (const order of orders) {
       try {
+        console.log('Processing order:', order.id, '| Symbol:', order.symbol, '| Direction:', order.direction, '| Limit:', order.limit_price);
         // ── Fetch price with fallbacks ──
         let currentPrice = null;
         try {
