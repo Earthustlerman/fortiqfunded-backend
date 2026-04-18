@@ -361,17 +361,13 @@ async function checkPendingLimitOrders() {
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
         if (!shouldExecute) continue;
 
-        // ── Mark as executed FIRST before doing anything else ──
-        // This prevents duplicate execution on the next cron run
-        await supabase.from('orders').update({ 
-          status: 'executed', 
-          executed_at: new Date().toISOString() 
-        }).eq('id', order.id);
+        // ── Mark as executed using SQL function to prevent duplicates ──
+        await supabase.rpc('mark_order_executed', { order_id: order.id });
 
-        // Verify the order was actually updated (not already executed by another run)
+        // Verify the order was actually updated
         const { data: updatedOrder } = await supabase.from('orders').select('status').eq('id', order.id).single();
         if (!updatedOrder || updatedOrder.status !== 'executed') {
-          console.log('Order status not updated, skipping to avoid duplicate:', order.id);
+          console.log('Order already executed by another run, skipping:', order.id);
           continue;
         }
 
