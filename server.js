@@ -360,15 +360,14 @@ async function checkPendingLimitOrders() {
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
         if (!shouldExecute) continue;
-        // Mark as executed IMMEDIATELY to prevent duplicate execution on next cron run
-        const { data: updateData, error: updateErr } = await supabase
-          .from('orders').update({ status: 'executed', executed_at: new Date().toISOString() })
-          .eq('id', order.id).eq('status', 'pending').select();
-        // If update didn't change anything, another cron run already executed it
-        if (updateErr || !updateData || updateData.length === 0) {
-          console.log('Order already executed by another run, skipping:', order.id);
+        // Delete the order immediately to prevent duplicate execution
+        const { error: deleteErr } = await supabase.from('orders').delete().eq('id', order.id).eq('status', 'pending');
+        if (deleteErr) {
+          console.log('Order already being processed, skipping:', order.id);
           continue;
         }
+        // Insert into order_history for record keeping
+        await supabase.from('orders').insert({...order, status: 'executed', executed_at: new Date().toISOString()}).catch(function(){});
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
         if (!account || account.status !== 'active') continue;
         if (parseFloat(order.amount) > parseFloat(account.balance)) continue;
