@@ -488,12 +488,13 @@ app.post('/close-position', async (req, res) => {
     const activeDays = account.active_days || 0;
     const stage1Passed = stage === 1 && newProfit >= 400 && activeDays >= 5 && !ruleBreached;
     const stage2CapHit = stage === 2 && newProfit >= 5000;
-    await supabase.from('positions').update({
+   const updateResult = await supabase.from('positions').update({
       status: 'closed',
       exit_price: exitPrice,
       pnl: pnl,
       closed_at: new Date().toISOString()
     }).eq('id', position_id);
+    console.log('Position update result:', JSON.stringify(updateResult));
     if (ruleBreached) {
       await supabase.from('accounts').update({
         balance: newBalance, profit: newProfit, daily_loss: newDailyLoss,
