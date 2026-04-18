@@ -353,21 +353,8 @@ async function checkPendingLimitOrders() {
             if (data2.price) currentPrice = parseFloat(data2.price);
           } catch(e) { console.log('Binance futures price error:', e.message); }
         }
-// Kraken fallback
-        if (!currentPrice) {
-          try {
-            const krakenMap = {'BTCUSDT':'XBTUSD','ETHUSDT':'ETHUSD','SOLUSDT':'SOLUSD','XRPUSDT':'XRPUSD','ADAUSDT':'ADAUSD','DOGEUSDT':'XDGUSD','DOTUSDT':'DOTUSD','LINKUSDT':'LINKUSD'};
-            const krakenPair = krakenMap[order.symbol];
-            if (krakenPair) {
-              const kr = await fetch('https://api.kraken.com/0/public/Ticker?pair=' + krakenPair);
-              const kd = await kr.json();
-              const pairs = Object.values(kd.result || {});
-              if (pairs.length > 0) currentPrice = parseFloat(pairs[0].c[0]);
-              console.log('Kraken fallback price for limit order:', currentPrice);
-            }
-          } catch(e) { console.log('Kraken price error for limit order:', e.message); }
-        }
-        if (!currentPrice) { console.log('Could not fetch price for limit order:', order.symbol); continue; }
+
+        if (!currentPrice) continue;
         const limitPrice = parseFloat(order.limit_price);
         let shouldExecute = false;
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
@@ -377,10 +364,20 @@ async function checkPendingLimitOrders() {
         // ── Mark as executed using SQL function to prevent duplicates ──
         await supabase.rpc('mark_order_executed', { order_id: order.id });
 
-        // Verify the order was actually updated
-        const { data: updatedOrder } = await supabase.from('orders').select('status').eq('id', order.id).single();
+        // Small delay to let the update propagate
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verify the order was actually updated by this run
+        const { data: updatedOrder } = await supabase.from('orders').select('status, executed_at').eq('id', order.id).single();
         if (!updatedOrder || updatedOrder.status !== 'executed') {
           console.log('Order already executed by another run, skipping:', order.id);
+          continue;
+        }
+        // Check if executed very recently (within last 2 seconds) to avoid race condition
+        const execTime = new Date(updatedOrder.executed_at).getTime();
+        const now = Date.now();
+        if (now - execTime > 2000) {
+          console.log('Order was executed by another instance, skipping:', order.id);
           continue;
         }
 
