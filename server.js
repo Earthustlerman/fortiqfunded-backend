@@ -360,7 +360,8 @@ async function checkPendingLimitOrders() {
         let shouldExecute = false;
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
-        if (!shouldExecute) continue;
+        console.log('Should execute:', shouldExecute, '| Current:', currentPrice, '| Limit:', limitPrice);
+if (!shouldExecute) continue;
 
         // ── Mark as executed using SQL function — returns true only if THIS run claimed it ──
         const { data: claimed, error: claimErr } = await supabase.rpc('mark_order_executed', { order_id: order.id });
