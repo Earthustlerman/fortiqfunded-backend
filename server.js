@@ -393,6 +393,7 @@ app.post('/close-position', async (req, res) => {
     const { data: position, error: posErr } = await supabase
       .from('positions').select('*').eq('id', position_id).eq('account_id', account_id).eq('user_id', user_id).eq('status', 'open').single();
     if (posErr || !position) return res.status(404).json({ error: 'Position not found or already closed' });
+    await supabase.from('positions').update({ status: 'closing' }).eq('id', position_id).eq('status', 'open');
     const { data: account, error: accErr } = await supabase
       .from('accounts').select('*').eq('account_id', account_id).eq('status', 'active').single();
     if (accErr || !account) return res.status(404).json({ error: 'Account not found or not active' });
