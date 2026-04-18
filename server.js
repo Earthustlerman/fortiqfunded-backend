@@ -354,7 +354,7 @@ async function checkPendingLimitOrders() {
           } catch(e) { console.log('Binance futures price error:', e.message); }
         }
 
-        if (!currentPrice) continue;
+        if (!currentPrice) { console.log('Could not fetch price for limit order:', order.symbol); continue; }
         const limitPrice = parseFloat(order.limit_price);
         let shouldExecute = false;
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
