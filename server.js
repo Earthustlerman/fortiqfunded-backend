@@ -360,11 +360,18 @@ async function checkPendingLimitOrders() {
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
         if (!shouldExecute) continue;
-        // Mark as executing immediately to prevent duplicate execution
-        await supabase.from('orders').update({ status: 'executing' }).eq('id', order.id).eq('status', 'pending');
+        // Mark as executed IMMEDIATELY to prevent duplicate execution on next cron run
+        const { data: updateData, error: updateErr } = await supabase
+          .from('orders').update({ status: 'executed', executed_at: new Date().toISOString() })
+          .eq('id', order.id).eq('status', 'pending').select();
+        // If update didn't change anything, another cron run already executed it
+        if (updateErr || !updateData || updateData.length === 0) {
+          console.log('Order already executed by another run, skipping:', order.id);
+          continue;
+        }
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
-        if (!account || account.status !== 'active') { await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id); continue; }
-        if (parseFloat(order.amount) > parseFloat(account.balance)) { await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id); continue; }
+        if (!account || account.status !== 'active') continue;
+        if (parseFloat(order.amount) > parseFloat(account.balance)) continue;
         const pos = {
           user_id: order.user_id, account_id: order.account_id, symbol: order.symbol,
           direction: order.direction, amount: order.amount, leverage: order.leverage,
@@ -376,7 +383,6 @@ async function checkPendingLimitOrders() {
         await supabase.from('positions').insert(pos);
         const newBalance = parseFloat(account.balance) - parseFloat(order.amount);
         await supabase.from('accounts').update({ balance: newBalance, status: 'active' }).eq('account_id', order.account_id);
-        await supabase.from('orders').update({ status: 'executed', executed_at: new Date().toISOString() }).eq('id', order.id);
         console.log('Limit order executed:', order.id, order.symbol, order.direction, '@', limitPrice);
       } catch (err) {
         console.log('Error processing limit order:', order.id, err.message);
