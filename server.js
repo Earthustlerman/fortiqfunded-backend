@@ -361,25 +361,13 @@ async function checkPendingLimitOrders() {
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
         if (!shouldExecute) continue;
 
-        // ── Mark as executed using SQL function to prevent duplicates ──
-        await supabase.rpc('mark_order_executed', { order_id: order.id });
-
-        // Small delay to let the update propagate
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Verify the order was actually updated by this run
-        const { data: updatedOrder } = await supabase.from('orders').select('status, executed_at').eq('id', order.id).single();
-        if (!updatedOrder || updatedOrder.status !== 'executed') {
-          console.log('Order already executed by another run, skipping:', order.id);
+        // ── Mark as executed using SQL function — returns true only if THIS run claimed it ──
+        const { data: claimed, error: claimErr } = await supabase.rpc('mark_order_executed', { order_id: order.id });
+        if (claimErr || !claimed) {
+          console.log('Order already claimed by another instance, skipping:', order.id);
           continue;
         }
-        // Check if executed very recently (within last 2 seconds) to avoid race condition
-        const execTime = new Date(updatedOrder.executed_at).getTime();
-        const now = Date.now();
-        if (now - execTime > 2000) {
-          console.log('Order was executed by another instance, skipping:', order.id);
-          continue;
-        }
+        console.log('Order claimed successfully by this instance:', order.id);
 
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
         if (!account || account.status !== 'active') {
