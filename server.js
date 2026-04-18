@@ -360,29 +360,42 @@ async function checkPendingLimitOrders() {
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
         if (!shouldExecute) continue;
-        // Delete the order immediately to prevent duplicate execution
-        const { error: deleteErr } = await supabase.from('orders').delete().eq('id', order.id).eq('status', 'pending');
-        if (deleteErr) {
-          console.log('Order already being processed, skipping:', order.id);
+
+        // ── Mark as executed FIRST before doing anything else ──
+        // This prevents duplicate execution on the next cron run
+        await supabase.from('orders').update({ 
+          status: 'executed', 
+          executed_at: new Date().toISOString() 
+        }).eq('id', order.id);
+
+        // Verify the order was actually updated (not already executed by another run)
+        const { data: updatedOrder } = await supabase.from('orders').select('status').eq('id', order.id).single();
+        if (!updatedOrder || updatedOrder.status !== 'executed') {
+          console.log('Order status not updated, skipping to avoid duplicate:', order.id);
           continue;
         }
-        // Insert into order_history for record keeping
-        await supabase.from('orders').insert({...order, status: 'executed', executed_at: new Date().toISOString()}).catch(function(){});
+
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
-        if (!account || account.status !== 'active') continue;
-        if (parseFloat(order.amount) > parseFloat(account.balance)) continue;
+        if (!account || account.status !== 'active') {
+          console.log('Account not active, skipping limit order:', order.id);
+          continue;
+        }
+        if (parseFloat(order.amount) > parseFloat(account.balance)) {
+          console.log('Insufficient balance for limit order:', order.id);
+          continue;
+        }
         const pos = {
           user_id: order.user_id, account_id: order.account_id, symbol: order.symbol,
-          direction: order.direction, amount: order.amount, leverage: order.leverage,
+          direction: order.direction, amount: parseFloat(order.amount), leverage: parseFloat(order.leverage),
           entry_price: limitPrice, size: parseFloat(order.amount) * parseFloat(order.leverage),
           status: 'open', opened_at: new Date().toISOString()
         };
-        if (order.take_profit) pos.take_profit = order.take_profit;
-        if (order.stop_loss) pos.stop_loss = order.stop_loss;
+        if (order.take_profit) pos.take_profit = parseFloat(order.take_profit);
+        if (order.stop_loss) pos.stop_loss = parseFloat(order.stop_loss);
         await supabase.from('positions').insert(pos);
-        const newBalance = parseFloat(account.balance) - parseFloat(order.amount);
+        const newBalance = parseFloat((parseFloat(account.balance) - parseFloat(order.amount)).toFixed(2));
         await supabase.from('accounts').update({ balance: newBalance, status: 'active' }).eq('account_id', order.account_id);
-        console.log('Limit order executed:', order.id, order.symbol, order.direction, '@', limitPrice);
+        console.log('Limit order executed successfully:', order.id, order.symbol, order.direction, '@', limitPrice, '| New balance:', newBalance);
       } catch (err) {
         console.log('Error processing limit order:', order.id, err.message);
       }
