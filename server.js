@@ -360,6 +360,8 @@ async function checkPendingLimitOrders() {
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
         if (!shouldExecute) continue;
+        // Mark as executing immediately to prevent duplicate execution
+        await supabase.from('orders').update({ status: 'executing' }).eq('id', order.id).eq('status', 'pending');
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
         if (!account || account.status !== 'active') { await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id); continue; }
         if (parseFloat(order.amount) > parseFloat(account.balance)) { await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id); continue; }
