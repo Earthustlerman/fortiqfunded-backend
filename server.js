@@ -340,7 +340,8 @@ async function checkPendingLimitOrders() {
       try {
         console.log('Processing order:', order.id, '| Symbol:', order.symbol, '| Direction:', order.direction, '| Limit:', order.limit_price);
         // ── Fetch price with fallbacks ──
-        let currentPrice = null;
+       let currentPrice = null;
+console.log('Fetching price for:', order.symbol);
         try {
           const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + order.symbol);
           const data = await res.json();
