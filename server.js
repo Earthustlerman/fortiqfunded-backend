@@ -380,17 +380,11 @@ console.log('Fetching price for:', order.symbol);
         console.log('Should execute:', shouldExecute, '| Current:', currentPrice, '| Limit:', limitPrice);
 if (!shouldExecute) continue;
 
-      // ── Mark as executed directly ──
-        const { error: claimErr } = await supabase.from('orders').update({ status: 'executed', executed_at: new Date().toISOString() }).eq('id', order.id).eq('status', 'pending');
-        if (claimErr) {
-          console.log('Error claiming order:', claimErr.message);
-          continue;
-        }
-        // Verify it was actually updated
-        const { data: checkOrder } = await supabase.from('orders').select('status').eq('id', order.id).single();
-        console.log('Order status after claim attempt:', checkOrder ? checkOrder.status : 'not found');
-        if (!checkOrder || checkOrder.status !== 'executed') {
-          console.log('Order not claimed by this instance, skipping:', order.id);
+      // ── Mark as executed using SQL function — returns true only if THIS run claimed it ──
+        const { data: claimed, error: claimErr } = await supabase.rpc('mark_order_executed', { order_id: order.id });
+        console.log('Claim result:', claimed, '| Error:', claimErr ? claimErr.message : 'none');
+        if (claimErr || !claimed) {
+          console.log('Order already claimed by another instance, skipping:', order.id);
           continue;
         }
         console.log('Order claimed successfully:', order.id);
