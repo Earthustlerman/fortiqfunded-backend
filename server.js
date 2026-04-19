@@ -387,9 +387,6 @@ if (!shouldExecute) continue;
           console.log('Order already claimed by another instance, skipping:', order.id);
           continue;
         }
-        console.log('Order claimed successfully:', order.id);
-          continue;
-        }
         console.log('Order claimed successfully by this instance:', order.id);
 
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
