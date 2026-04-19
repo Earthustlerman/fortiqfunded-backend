@@ -561,7 +561,7 @@ app.post('/close-position', async (req, res) => {
       newDailyLoss = parseFloat((currentDailyLoss + lossPercent).toFixed(4));
     }
     const drawdownFromStart = ((5000 - newBalance) / 5000) * 100;
-    const newMaxDrawdown = parseFloat(Math.max(currentMaxDrawdown, Math.max(0, drawdownFromStart)).toFixed(4));
+    const newMaxDrawdown = parseFloat(Math.max(currentMaxDrawdown + (pnl < 0 ? (Math.abs(pnl) / 5000) * 100 : 0), drawdownFromStart).toFixed(4));
     const dailyLimitBreached = newDailyLoss >= 5;
     const drawdownBreached = newMaxDrawdown >= 8;
     const ruleBreached = dailyLimitBreached || drawdownBreached;
