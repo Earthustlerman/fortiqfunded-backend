@@ -695,6 +695,7 @@ app.post('/track-referral', async (req, res) => {
     console.log('Referral tracked:', referrer.user_id, '->', referred_user_id);
     res.json({ success: true });
   } catch (err) {
+    console.log('Track referral error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
