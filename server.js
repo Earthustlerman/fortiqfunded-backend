@@ -300,6 +300,16 @@ async function activateChallenge(payment) {
   console.log('Challenge activated:', accId);
 
   await sendEmail('New Challenge Activated — Fortiq Funded', 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nAccount ID: ' + accId + '\nAmount: $' + payment.amount + ' USDT');
+  // Auto-approve affiliate commission if this trader was referred
+  try {
+    const { data: affiliate } = await supabase.from('affiliates').select('*').eq('referred_id', profile.user_id).eq('status', 'pending').single();
+    if (affiliate) {
+      await supabase.from('affiliates').update({ status: 'approved' }).eq('id', affiliate.id);
+      console.log('Affiliate commission approved for referrer:', affiliate.referrer_id);
+    }
+  } catch (e) {
+    console.log('Affiliate approval check:', e.message);
+  }
   await sendTraderEmail(profile.email, '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId, challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2)));
 }
 
