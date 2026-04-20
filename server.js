@@ -647,7 +647,7 @@ app.post('/notify-payout', async (req, res) => {
 
 app.get('/leaderboard', async (req, res) => {
   try {
-    const { data: accounts } = await supabase.from('accounts').select('account_id, user_id, profit, active_days, status, payout_amount').eq('status', 'funded').eq('paid_out', true).order('profit', { ascending: false }).limit(20);
+    const { data: accounts } = await supabase.from('accounts').select('account_id, user_id, profit, active_days, status, payout_amount').in('status', ['funded', 'closed']).eq('paid_out', true).order('profit', { ascending: false }).limit(20);
     if (!accounts || accounts.length === 0) return res.json({ leaderboard: [] });
     const leaderboard = await Promise.all(accounts.map(async (acc, index) => {
       const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', acc.user_id).single();
