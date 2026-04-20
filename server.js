@@ -165,7 +165,6 @@ function stage2ActivatedEmail(traderName, accId) {
     </div>`);
 }
 
-// ── IMPROVED PAYMENT VERIFICATION WITH MULTIPLE API FALLBACKS ──
 async function checkPendingPayments() {
   console.log('Checking pending payments...');
   const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending');
@@ -177,7 +176,6 @@ async function checkPendingPayments() {
       let confirmations = 0;
       let found = false;
 
-      // ── Method 1: TronGrid v1/transactions ──
       try {
         const res = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash, {
           headers: { 'TRON-PRO-API-KEY': TRONGRID_KEY }
@@ -190,15 +188,12 @@ async function checkPendingPayments() {
             amount = parseInt(tx.trc20_transfers[0].amount_str || '0') / 1000000;
             if (amount > 0) {
               found = true;
-              console.log('Method 1 (TronGrid v1) found TX:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+              console.log('Method 1 found TX:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
             }
           }
         }
-      } catch (e) {
-        console.log('Method 1 TronGrid error:', e.message);
-      }
+      } catch (e) { console.log('Method 1 error:', e.message); }
 
-      // ── Method 2: TronGrid events endpoint ──
       if (!found || amount === 0) {
         try {
           const res2 = await fetch('https://api.trongrid.io/v1/transactions/' + payment.tx_hash + '/events', {
@@ -213,18 +208,15 @@ async function checkPendingPayments() {
                   amount = val;
                   confirmations = confirmations || 999;
                   found = true;
-                  console.log('Method 2 (TronGrid events) found TX:', payment.tx_hash, '| Amount:', amount);
+                  console.log('Method 2 found TX:', payment.tx_hash, '| Amount:', amount);
                   break;
                 }
               }
             }
           }
-        } catch (e) {
-          console.log('Method 2 TronGrid events error:', e.message);
-        }
+        } catch (e) { console.log('Method 2 error:', e.message); }
       }
 
-      // ── Method 3: TronScan API fallback ──
       if (!found || amount === 0) {
         try {
           const res3 = await fetch('https://apilist.tronscanapi.com/api/transaction-info?hash=' + payment.tx_hash, {
@@ -238,15 +230,12 @@ async function checkPendingPayments() {
             confirmations = data3.confirmations || 999;
             if (amount > 0) {
               found = true;
-              console.log('Method 3 (TronScan) found TX:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+              console.log('Method 3 found TX:', payment.tx_hash, '| Amount:', amount);
             }
           }
-        } catch (e) {
-          console.log('Method 3 TronScan error:', e.message);
-        }
+        } catch (e) { console.log('Method 3 error:', e.message); }
       }
 
-      // ── Method 4: TronGrid wallet/transactions search ──
       if (!found || amount === 0) {
         try {
           const res4 = await fetch('https://api.trongrid.io/v1/contracts/TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t/transactions?limit=10&only_confirmed=true', {
@@ -258,21 +247,13 @@ async function checkPendingPayments() {
             if (match) {
               amount = parseInt(match.token_info && match.value ? match.value : '0') / 1000000;
               confirmations = 999;
-              if (amount > 0) {
-                found = true;
-                console.log('Method 4 (TronGrid contract search) found TX:', payment.tx_hash);
-              }
+              if (amount > 0) { found = true; console.log('Method 4 found TX:', payment.tx_hash); }
             }
           }
-        } catch (e) {
-          console.log('Method 4 error:', e.message);
-        }
+        } catch (e) { console.log('Method 4 error:', e.message); }
       }
 
-      if (!found || amount === 0) {
-        console.log('TX not found yet by any method:', payment.tx_hash);
-        continue;
-      }
+      if (!found || amount === 0) { console.log('TX not found yet:', payment.tx_hash); continue; }
 
       console.log('TX verified:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
       await supabase.from('payments').update({ confirmations, amount }).eq('id', payment.id);
@@ -284,7 +265,6 @@ async function checkPendingPayments() {
         continue;
       }
 
-      // Treat confirmations >= 19 OR 999 (from fallback methods) as confirmed
       if (confirmations >= 19 || confirmations === 999) {
         await activateChallenge(payment);
       } else {
@@ -303,7 +283,6 @@ async function activateChallenge(payment) {
   const userNum = profile.user_id.replace('USR-', '');
   const accId = 'ACC-' + userNum;
 
-  // Check if already activated to prevent duplicate activation
   const { data: existing } = await supabase.from('accounts').select('account_id, status').eq('account_id', accId).single();
   if (existing && existing.status === 'active') {
     console.log('Account already active:', accId);
@@ -312,16 +291,9 @@ async function activateChallenge(payment) {
   }
 
   await supabase.from('accounts').upsert({
-    user_id: payment.user_id,
-    account_id: accId,
-    account_type: 'challenge',
-    status: 'active',
-    stage: 1,
-    balance: 5000,
-    profit: 0,
-    daily_loss: 0,
-    max_drawdown: 0,
-    active_days: 0
+    user_id: payment.user_id, account_id: accId, account_type: 'challenge',
+    status: 'active', stage: 1, balance: 5000, profit: 0,
+    daily_loss: 0, max_drawdown: 0, active_days: 0
   }, { onConflict: 'account_id' });
 
   await supabase.from('payments').update({ status: 'confirmed', account_id: accId }).eq('id', payment.id);
@@ -338,10 +310,8 @@ async function checkPendingLimitOrders() {
     if (!orders || orders.length === 0) return;
     for (const order of orders) {
       try {
-        console.log('Processing order:', order.id, '| Symbol:', order.symbol, '| Direction:', order.direction, '| Limit:', order.limit_price);
-        // ── Fetch price with fallbacks ──
-       let currentPrice = null;
-console.log('Fetching price for:', order.symbol);
+        let currentPrice = null;
+
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 3000);
@@ -358,7 +328,7 @@ console.log('Fetching price for:', order.symbol);
             if (data2.price) currentPrice = parseFloat(data2.price);
           } catch(e) { console.log('Binance futures price error:', e.message); }
         }
-// Kraken fallback
+
         if (!currentPrice) {
           try {
             const krakenMap = {'BTCUSDT':'XBTUSD','ETHUSDT':'ETHUSD','SOLUSDT':'SOLUSD','XRPUSDT':'XRPUSD','ADAUSDT':'ADAUSD','DOGEUSDT':'XDGUSD','DOTUSDT':'DOTUSD','LINKUSDT':'LINKUSD'};
@@ -368,36 +338,28 @@ console.log('Fetching price for:', order.symbol);
               const kd = await kr.json();
               const pairs = Object.values(kd.result || {});
               if (pairs.length > 0) currentPrice = parseFloat(pairs[0].c[0]);
-              console.log('Kraken fallback price for limit order:', currentPrice);
             }
           } catch(e) { console.log('Kraken price error for limit order:', e.message); }
         }
-        if (!currentPrice) { console.log('Could not fetch price for limit order:', order.symbol); continue; }
+
+        if (!currentPrice) continue;
+
         const limitPrice = parseFloat(order.limit_price);
         let shouldExecute = false;
         if (order.direction === 'long' && currentPrice <= limitPrice) shouldExecute = true;
         if (order.direction === 'short' && currentPrice >= limitPrice) shouldExecute = true;
-        console.log('Should execute:', shouldExecute, '| Current:', currentPrice, '| Limit:', limitPrice);
-if (!shouldExecute) continue;
+        if (!shouldExecute) continue;
 
-      // ── Mark as executed using SQL function — returns true only if THIS run claimed it ──
         const { data: claimed, error: claimErr } = await supabase.rpc('mark_order_executed', { order_id: order.id });
-        console.log('Claim result:', claimed, '| Error:', claimErr ? claimErr.message : 'none');
         if (claimErr || !claimed) {
-          console.log('Order already claimed by another instance, skipping:', order.id);
+          console.log('Order already claimed, skipping:', order.id);
           continue;
         }
-        console.log('Order claimed successfully by this instance:', order.id);
 
         const { data: account } = await supabase.from('accounts').select('*').eq('account_id', order.account_id).single();
-        if (!account || account.status !== 'active') {
-          console.log('Account not active, skipping limit order:', order.id);
-          continue;
-        }
-        if (parseFloat(order.amount) > parseFloat(account.balance)) {
-          console.log('Insufficient balance for limit order:', order.id);
-          continue;
-        }
+        if (!account || account.status !== 'active') continue;
+        if (parseFloat(order.amount) > parseFloat(account.balance)) continue;
+
         const pos = {
           user_id: order.user_id, account_id: order.account_id, symbol: order.symbol,
           direction: order.direction, amount: parseFloat(order.amount), leverage: parseFloat(order.leverage),
@@ -409,7 +371,7 @@ if (!shouldExecute) continue;
         await supabase.from('positions').insert(pos);
         const newBalance = parseFloat((parseFloat(account.balance) - parseFloat(order.amount)).toFixed(2));
         await supabase.from('accounts').update({ balance: newBalance, status: 'active' }).eq('account_id', order.account_id);
-        console.log('Limit order executed successfully:', order.id, order.symbol, order.direction, '@', limitPrice, '| New balance:', newBalance);
+        console.log('Limit order executed:', order.id, order.symbol, order.direction, '@', limitPrice, '| New balance:', newBalance);
       } catch (err) {
         console.log('Error processing limit order:', order.id, err.message);
       }
@@ -419,12 +381,10 @@ if (!shouldExecute) continue;
   }
 }
 
-// ── OPEN POSITION (SERVER-SIDE BALANCE DEDUCTION) ──
 app.post('/open-position', async (req, res) => {
   const { user_id, account_id, symbol, direction, amount, leverage, entry_price, size, take_profit, stop_loss } = req.body;
   if (!user_id || !account_id || !symbol || !direction || !amount || !entry_price) return res.status(400).json({ error: 'Missing fields' });
   try {
-    // Get account and verify ownership
     const { data: account, error: accErr } = await supabase
       .from('accounts').select('*').eq('account_id', account_id).eq('status', 'active').single();
     if (accErr || !account) return res.status(404).json({ error: 'Account not found or not active' });
@@ -432,15 +392,10 @@ app.post('/open-position', async (req, res) => {
 
     const amt = parseFloat(amount);
     const currentBalance = parseFloat(account.balance);
-
-    // Check balance
     if (amt > currentBalance) return res.status(400).json({ error: 'Amount exceeds available balance' });
-
-    // Check daily loss and drawdown limits
     if (parseFloat(account.daily_loss || 0) >= 5) return res.status(400).json({ error: 'Daily loss limit reached' });
     if (parseFloat(account.max_drawdown || 0) >= 8) return res.status(400).json({ error: 'Max drawdown reached' });
 
-    // Insert position
     const pos = {
       user_id, account_id, symbol, direction,
       amount: amt, leverage: parseFloat(leverage) || 1,
@@ -454,11 +409,9 @@ app.post('/open-position', async (req, res) => {
     const { data: newPos, error: posErr } = await supabase.from('positions').insert(pos).select().single();
     if (posErr) return res.status(500).json({ error: posErr.message });
 
-    // Deduct balance
     const newBalance = parseFloat((currentBalance - amt).toFixed(2));
     await supabase.from('accounts').update({ balance: newBalance, status: 'active' }).eq('account_id', account_id);
-
-    console.log('Position opened server-side:', newPos.id, '| Symbol:', symbol, '| Amount:', amt, '| New balance:', newBalance);
+    console.log('Position opened:', newPos.id, '| Symbol:', symbol, '| Amount:', amt, '| New balance:', newBalance);
     res.json({ success: true, position: newPos, newBalance });
   } catch (err) {
     console.log('open-position error:', err.message);
@@ -466,7 +419,6 @@ app.post('/open-position', async (req, res) => {
   }
 });
 
-// ── CLOSE POSITION (SECURE SERVER-SIDE P&L CALCULATION) ──
 app.post('/close-position', async (req, res) => {
   const { position_id, account_id, user_id } = req.body;
   if (!position_id || !account_id || !user_id) return res.status(400).json({ error: 'Missing fields' });
@@ -478,30 +430,23 @@ app.post('/close-position', async (req, res) => {
       .from('accounts').select('*').eq('account_id', account_id).eq('status', 'active').single();
     if (accErr || !account) return res.status(404).json({ error: 'Account not found or not active' });
     if (account.user_id !== user_id) return res.status(403).json({ error: 'Unauthorised' });
-    // ── Fetch exit price with multiple fallbacks ──
+
     let exitPrice = null;
 
-    // Method 1: Binance REST API
     try {
       const priceRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=' + position.symbol);
       const priceData = await priceRes.json();
       if (priceData.price) exitPrice = parseFloat(priceData.price);
-    } catch (e) {
-      console.log('Binance price fetch failed:', e.message);
-    }
+    } catch (e) { console.log('Binance price fetch failed:', e.message); }
 
-    // Method 2: Binance Futures API
     if (!exitPrice || isNaN(exitPrice)) {
       try {
         const priceRes2 = await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol=' + position.symbol);
         const priceData2 = await priceRes2.json();
         if (priceData2.price) exitPrice = parseFloat(priceData2.price);
-      } catch (e) {
-        console.log('Binance futures price fetch failed:', e.message);
-      }
+      } catch (e) { console.log('Binance futures price fetch failed:', e.message); }
     }
 
-    // Method 3: CoinGecko API
     if (!exitPrice || isNaN(exitPrice)) {
       try {
         const coinMap = {'BTCUSDT':'bitcoin','ETHUSDT':'ethereum','BNBUSDT':'binancecoin','SOLUSDT':'solana','XRPUSDT':'ripple','ADAUSDT':'cardano','DOGEUSDT':'dogecoin','AVAXUSDT':'avalanche-2','DOTUSDT':'polkadot','LINKUSDT':'chainlink'};
@@ -509,13 +454,9 @@ app.post('/close-position', async (req, res) => {
         const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=' + coinId + '&vs_currencies=usd');
         const cgData = await cgRes.json();
         if (cgData[coinId] && cgData[coinId].usd) exitPrice = parseFloat(cgData[coinId].usd);
-        console.log('CoinGecko fallback price:', exitPrice);
-      } catch (e) {
-        console.log('CoinGecko price fetch failed:', e.message);
-      }
+      } catch (e) { console.log('CoinGecko price fetch failed:', e.message); }
     }
 
-    // Method 4: Kraken API
     if (!exitPrice || isNaN(exitPrice)) {
       try {
         const krakenMap = {'BTCUSDT':'XBTUSD','ETHUSDT':'ETHUSD','SOLUSDT':'SOLUSD','XRPUSDT':'XRPUSD','ADAUSDT':'ADAUSD','DOGEUSDT':'XDGUSD','DOTUSDT':'DOTUSD','LINKUSDT':'LINKUSD'};
@@ -525,27 +466,18 @@ app.post('/close-position', async (req, res) => {
           const krakenData = await krakenRes.json();
           const pairs = Object.values(krakenData.result || {});
           if (pairs.length > 0) exitPrice = parseFloat(pairs[0].c[0]);
-          console.log('Kraken fallback price:', exitPrice);
         }
-      } catch (e) {
-        console.log('Kraken price fetch failed:', e.message);
-      }
+      } catch (e) { console.log('Kraken price fetch failed:', e.message); }
     }
 
     if (!exitPrice || isNaN(exitPrice)) return res.status(500).json({ error: 'Could not fetch current price from any source' });
-    console.log('Exit price fetched:', exitPrice, 'for', position.symbol);
+
     const entryPrice = parseFloat(position.entry_price);
     const amount = parseFloat(position.amount);
     const size = parseFloat(position.size);
-    let priceDiff = 0;
-    if (position.direction === 'long') {
-      priceDiff = (exitPrice - entryPrice) / entryPrice;
-    } else {
-      priceDiff = (entryPrice - exitPrice) / entryPrice;
-    }
+    let priceDiff = position.direction === 'long' ? (exitPrice - entryPrice) / entryPrice : (entryPrice - exitPrice) / entryPrice;
     let rawPnl = priceDiff * size;
-    const maxLoss = -amount;
-    if (rawPnl < maxLoss) rawPnl = maxLoss;
+    if (rawPnl < -amount) rawPnl = -amount;
     const pnl = parseFloat(rawPnl.toFixed(2));
     const returnedMargin = amount + pnl;
     const safeReturnedMargin = Math.max(0, returnedMargin);
@@ -556,10 +488,7 @@ app.post('/close-position', async (req, res) => {
     const newBalance = parseFloat((currentBalance + safeReturnedMargin).toFixed(2));
     const newProfit = parseFloat((currentProfit + pnl).toFixed(2));
     let newDailyLoss = currentDailyLoss;
-    if (pnl < 0) {
-      const lossPercent = (Math.abs(pnl) / 5000) * 100;
-      newDailyLoss = parseFloat((currentDailyLoss + lossPercent).toFixed(4));
-    }
+    if (pnl < 0) newDailyLoss = parseFloat((currentDailyLoss + (Math.abs(pnl) / 5000) * 100).toFixed(4));
     const drawdownFromStart = ((5000 - newBalance) / 5000) * 100;
     const newMaxDrawdown = parseFloat(Math.max(currentMaxDrawdown + (pnl < 0 ? (Math.abs(pnl) / 5000) * 100 : 0), drawdownFromStart).toFixed(4));
     const dailyLimitBreached = newDailyLoss >= 5;
@@ -569,17 +498,11 @@ app.post('/close-position', async (req, res) => {
     const activeDays = account.active_days || 0;
     const stage1Passed = stage === 1 && newProfit >= 400 && activeDays >= 5 && !ruleBreached;
     const stage2CapHit = stage === 2 && newProfit >= 5000;
-    await supabase.from('positions').update({
-      status: 'closed',
-      exit_price: exitPrice,
-      pnl: pnl,
-      closed_at: new Date().toISOString()
-    }).eq('id', position_id);
+
+    await supabase.from('positions').update({ status: 'closed', exit_price: exitPrice, pnl, closed_at: new Date().toISOString() }).eq('id', position_id);
+
     if (ruleBreached) {
-      await supabase.from('accounts').update({
-        balance: newBalance, profit: newProfit, daily_loss: newDailyLoss,
-        max_drawdown: newMaxDrawdown, status: 'failed'
-      }).eq('account_id', account_id);
+      await supabase.from('accounts').update({ balance: newBalance, profit: newProfit, daily_loss: newDailyLoss, max_drawdown: newMaxDrawdown, status: 'failed' }).eq('account_id', account_id);
       const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', user_id).single();
       if (profile) {
         const reason = dailyLimitBreached ? 'Daily loss limit of 5% exceeded' : 'Maximum drawdown of 8% exceeded';
@@ -589,10 +512,10 @@ app.post('/close-position', async (req, res) => {
       console.log('Account failed after position close:', account_id);
       return res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, accountFailed: true, reason: dailyLimitBreached ? 'daily_loss' : 'drawdown' });
     }
-    await supabase.from('accounts').update({
-      balance: newBalance, profit: newProfit, daily_loss: newDailyLoss, max_drawdown: newMaxDrawdown
-    }).eq('account_id', account_id);
-    console.log('Position closed server-side:', position_id, '| P&L:', pnl, '| Exit:', exitPrice);
+
+    await supabase.from('accounts').update({ balance: newBalance, profit: newProfit, daily_loss: newDailyLoss, max_drawdown: newMaxDrawdown }).eq('account_id', account_id);
+    console.log('Position closed:', position_id, '| P&L:', pnl, '| Exit:', exitPrice);
+
     if (stage1Passed) {
       console.log('Stage 1 passed! Creating Stage 2 for:', account_id);
       try {
@@ -602,25 +525,21 @@ app.post('/close-position', async (req, res) => {
           const stage2AccId = 'FND-' + userNum;
           const { data: existing } = await supabase.from('accounts').select('account_id').eq('account_id', stage2AccId).single();
           if (!existing) {
-            await supabase.from('accounts').insert({
-              user_id: user_id, account_id: stage2AccId, account_type: 'funded',
-              status: 'active', stage: 2, balance: 5000, profit: 0,
-              daily_loss: 0, max_drawdown: 0, active_days: 0
-            });
+            await supabase.from('accounts').insert({ user_id, account_id: stage2AccId, account_type: 'funded', status: 'active', stage: 2, balance: 5000, profit: 0, daily_loss: 0, max_drawdown: 0, active_days: 0 });
             await supabase.from('accounts').update({ status: 'funded', stage2_account_id: stage2AccId }).eq('account_id', account_id);
             await sendTraderEmail(profile.email, '🏆 You Are Now a Funded Trader — ' + stage2AccId, stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId));
             await sendEmail('Stage 2 Auto-Created — ' + stage2AccId, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + account_id + '\nStage 2: ' + stage2AccId);
           }
           return res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, stage1Passed: true, stage2AccountId: stage2AccId });
         }
-      } catch (s2err) {
-        console.log('Stage 2 creation error:', s2err.message);
-      }
+      } catch (s2err) { console.log('Stage 2 creation error:', s2err.message); }
     }
+
     if (stage2CapHit) {
       console.log('Stage 2 profit cap hit for:', account_id);
       return res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, stage2CapHit: true });
     }
+
     res.json({ success: true, pnl, exitPrice, newBalance, newProfit, newDailyLoss, newMaxDrawdown, accountFailed: false, stage1Passed: false });
   } catch (err) {
     console.log('close-position error:', err.message);
@@ -628,7 +547,6 @@ app.post('/close-position', async (req, res) => {
   }
 });
 
-// ── CREATE STAGE 2 ACCOUNT ──
 app.post('/create-stage2', async (req, res) => {
   const { stage1_account_id, user_id } = req.body;
   if (!stage1_account_id || !user_id) return res.status(400).json({ error: 'Missing fields' });
@@ -639,11 +557,7 @@ app.post('/create-stage2', async (req, res) => {
     const stage2AccId = 'FND-' + userNum;
     const { data: existing } = await supabase.from('accounts').select('account_id').eq('account_id', stage2AccId).single();
     if (existing) return res.json({ success: true, stage2_account_id: stage2AccId, message: 'Already exists' });
-    await supabase.from('accounts').insert({
-      user_id: user_id, account_id: stage2AccId, account_type: 'funded',
-      status: 'active', stage: 2, balance: 5000, profit: 0,
-      daily_loss: 0, max_drawdown: 0, active_days: 0
-    });
+    await supabase.from('accounts').insert({ user_id, account_id: stage2AccId, account_type: 'funded', status: 'active', stage: 2, balance: 5000, profit: 0, daily_loss: 0, max_drawdown: 0, active_days: 0 });
     await supabase.from('accounts').update({ status: 'funded', stage2_account_id: stage2AccId }).eq('account_id', stage1_account_id);
     await sendTraderEmail(profile.email, '🏆 You Are Now a Funded Trader — ' + stage2AccId, stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId));
     await sendEmail('Stage 2 Funded Account Created — ' + stage2AccId, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + stage1_account_id + '\nStage 2: ' + stage2AccId);
@@ -655,7 +569,6 @@ app.post('/create-stage2', async (req, res) => {
   }
 });
 
-// ── NOTIFY ACCOUNT STATUS CHANGE ──
 app.post('/notify-status', async (req, res) => {
   const { account_id, status, reason } = req.body;
   if (!account_id || !status) return res.status(400).json({ error: 'Missing fields' });
@@ -675,7 +588,6 @@ app.post('/notify-status', async (req, res) => {
   }
 });
 
-// ── ADMIN LOGIN ──
 app.post('/admin-login', (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ success: false, error: 'Missing password' });
@@ -683,7 +595,6 @@ app.post('/admin-login', (req, res) => {
   return res.status(401).json({ success: false, error: 'Incorrect password' });
 });
 
-// ── PAYOUT NOTIFICATION ──
 app.post('/notify-payout', async (req, res) => {
   const { account_id, payout_amount, wallet_address } = req.body;
   if (!account_id || !payout_amount || !wallet_address) return res.status(400).json({ error: 'Missing required fields' });
@@ -724,7 +635,6 @@ app.post('/notify-payout', async (req, res) => {
   }
 });
 
-// ── LEADERBOARD ──
 app.get('/leaderboard', async (req, res) => {
   try {
     const { data: accounts } = await supabase.from('accounts').select('account_id, user_id, profit, active_days, status, payout_amount').eq('status', 'funded').eq('paid_out', true).order('profit', { ascending: false }).limit(20);
@@ -752,7 +662,6 @@ app.get('/leaderboard', async (req, res) => {
   }
 });
 
-// ── REFERRAL TRACKING ──
 app.post('/track-referral', async (req, res) => {
   const { referrer_code, referred_user_id } = req.body;
   if (!referrer_code || !referred_user_id) return res.status(400).json({ error: 'Missing fields' });
@@ -770,13 +679,11 @@ app.post('/track-referral', async (req, res) => {
   }
 });
 
-// ── MANUAL PAYMENT CHECK TRIGGER ──
 app.post('/check-payment', async (req, res) => {
   await checkPendingPayments();
   res.json({ message: 'Check triggered' });
 });
 
-// ── CRON JOBS ──
 cron.schedule('*/2 * * * *', checkPendingPayments);
 cron.schedule('*/30 * * * * *', checkPendingLimitOrders);
 cron.schedule('0 0 * * *', async function() {
