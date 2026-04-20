@@ -687,8 +687,10 @@ app.post('/track-referral', async (req, res) => {
     if (!referrer) return res.status(404).json({ error: 'Referrer not found' });
     console.log('Referrer found:', referrer.user_id);
     const { data: existing } = await supabase.from('affiliates').select('id').eq('referrer_id', referrer.user_id).eq('referred_id', referred_user_id).single();
+    console.log('Existing referral check:', existing ? 'found' : 'not found');
     if (existing) return res.json({ success: true, message: 'Referral already tracked' });
     const { error } = await supabase.from('affiliates').insert({ referrer_id: referrer.user_id, referred_id: referred_user_id, status: 'pending', commission: 50, paid: false });
+    console.log('Insert result:', error ? error.message : 'success');
     if (error) return res.status(500).json({ error: error.message });
     console.log('Referral tracked:', referrer.user_id, '->', referred_user_id);
     res.json({ success: true });
