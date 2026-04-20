@@ -677,8 +677,15 @@ app.post('/track-referral', async (req, res) => {
   console.log('Track referral called:', referrer_code, '->', referred_user_id);
   if (!referrer_code || !referred_user_id) return res.status(400).json({ error: 'Missing fields' });
   try {
-    const { data: referrer } = await supabase.from('profiles').select('user_id').or('user_id.eq.' + referrer_code + ',referral_code.eq.' + referrer_code).single();
+    let referrer = null;
+    const { data: r1 } = await supabase.from('profiles').select('user_id').eq('user_id', referrer_code).single();
+    if (r1) { referrer = r1; }
+    if (!referrer) {
+      const { data: r2 } = await supabase.from('profiles').select('user_id').eq('referral_code', referrer_code).single();
+      if (r2) referrer = r2;
+    }
     if (!referrer) return res.status(404).json({ error: 'Referrer not found' });
+    console.log('Referrer found:', referrer.user_id);
     const { data: existing } = await supabase.from('affiliates').select('id').eq('referrer_id', referrer.user_id).eq('referred_id', referred_user_id).single();
     if (existing) return res.json({ success: true, message: 'Referral already tracked' });
     const { error } = await supabase.from('affiliates').insert({ referrer_id: referrer.user_id, referred_id: referred_user_id, status: 'pending', commission: 50, paid: false });
