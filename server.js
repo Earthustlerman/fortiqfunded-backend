@@ -674,6 +674,7 @@ app.get('/leaderboard', async (req, res) => {
 
 app.post('/track-referral', async (req, res) => {
   const { referrer_code, referred_user_id } = req.body;
+  console.log('Track referral called:', referrer_code, '->', referred_user_id);
   if (!referrer_code || !referred_user_id) return res.status(400).json({ error: 'Missing fields' });
   try {
     const { data: referrer } = await supabase.from('profiles').select('user_id').or('user_id.eq.' + referrer_code + ',referral_code.eq.' + referrer_code).single();
