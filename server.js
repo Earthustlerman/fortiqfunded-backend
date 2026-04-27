@@ -258,7 +258,7 @@ async function checkPendingPayments() {
       console.log('TX verified:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
       await supabase.from('payments').update({ confirmations, amount }).eq('id', payment.id);
 
-      if (amount < 48) {
+      if (amount < 148) {
         console.log('Amount too low:', amount);
         await supabase.from('payments').update({ status: 'insufficient' }).eq('id', payment.id);
         await sendEmail('Payment Below Minimum — Fortiq Funded', 'TX Hash: ' + payment.tx_hash + '\nAmount: $' + amount + ' USDT\nUser ID: ' + payment.user_id);
