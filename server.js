@@ -671,7 +671,21 @@ app.get('/leaderboard', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
+app.post('/verify-recaptcha', async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ success: false });
+  try {
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'secret=' + process.env.RECAPTCHA_SECRET_KEY + '&response=' + token
+    });
+    const data = await response.json();
+    res.json({ success: data.success });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+});
 app.post('/track-referral', async (req, res) => {
   const { referrer_code, referred_user_id } = req.body;
   console.log('Track referral called:', referrer_code, '->', referred_user_id);
