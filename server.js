@@ -699,7 +699,29 @@ app.post('/track-referral', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.post('/submit-payout-wallet', async (req, res) => {
+  const { account_id, wallet, user_id } = req.body;
+  if (!account_id || !wallet || !user_id) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    const { data: account } = await supabase.from('accounts').select('user_id').eq('account_id', account_id).single();
+    if (!account || account.user_id !== user_id) return res.status(403).json({ error: 'Unauthorised' });
+    await supabase.from('accounts').update({ payout_wallet: wallet }).eq('account_id', account_id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+app.post('/submit-affiliate-wallet', async (req, res) => {
+  const { user_id, wallet } = req.body;
+  if (!user_id || !wallet) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    await supabase.from('profiles').update({ affiliate_wallet: wallet }).eq('id', user_id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.post('/check-payment', async (req, res) => {
   await checkPendingPayments();
   res.json({ message: 'Check triggered' });
