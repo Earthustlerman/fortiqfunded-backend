@@ -499,8 +499,7 @@ app.post('/close-position', async (req, res) => {
     const newProfit = parseFloat((currentProfit + pnl).toFixed(2));
     let newDailyLoss = currentDailyLoss;
     if (pnl < 0) newDailyLoss = parseFloat((currentDailyLoss + (Math.abs(pnl) / 5000) * 100).toFixed(4));
-    const drawdownFromStart = ((5000 - newBalance) / 5000) * 100;
-    const newMaxDrawdown = parseFloat(Math.max(currentMaxDrawdown + (pnl < 0 ? (Math.abs(pnl) / 5000) * 100 : 0), drawdownFromStart).toFixed(4));
+    const newMaxDrawdown = parseFloat((currentMaxDrawdown + (pnl < 0 ? (Math.abs(pnl) / 5000) * 100 : 0)).toFixed(4));
     const dailyLimitBreached = newDailyLoss >= 5;
     const drawdownBreached = newMaxDrawdown >= 8;
     const ruleBreached = dailyLimitBreached || drawdownBreached;
