@@ -324,7 +324,7 @@ async function checkPendingBEP20Payments() {
   if (!payments || payments.length === 0) return;
   for (const payment of payments) {
     try {
-      const url = 'https://api.bscscan.com/api?module=account&action=tokentx&contractaddress=' + USDC_BEP20_CONTRACT + '&address=' + BEP20_WALLET + '&startblock=0&endblock=99999999&sort=desc&apikey=' + BSCSCAN_KEY;
+      const url = 'https://api.etherscan.io/v2/api?chainid=56&module=account&action=tokentx&contractaddress=' + USDC_BEP20_CONTRACT + '&address=' + BEP20_WALLET + '&startblock=0&endblock=99999999&sort=desc&apikey=' + BSCSCAN_KEY;
       const res = await fetch(url);
       const data = await res.json();
       if (!data.result || data.status === '0') { console.log('BSCScan error or no transactions found'); continue; }
