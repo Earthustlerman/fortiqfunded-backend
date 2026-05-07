@@ -327,7 +327,7 @@ async function checkPendingBEP20Payments() {
       const url = 'https://api.etherscan.io/v2/api?chainid=56&module=account&action=tokentx&contractaddress=' + USDC_BEP20_CONTRACT + '&address=' + BEP20_WALLET + '&startblock=0&endblock=99999999&sort=desc&apikey=' + ETHERSCAN_KEY;
       const res = await fetch(url);
       const data = await res.json();
-      if (!data.result || data.status === '0') { console.log('BSCScan error or no transactions found'); continue; }
+      if (!data.result || data.status === '0') { console.log('BSCScan error or no transactions found:', JSON.stringify(data)); continue; }
       const tx = data.result.find(function(t) { return t.hash.toLowerCase() === payment.tx_hash.toLowerCase(); });
       if (!tx) { console.log('BEP20 TX not found yet:', payment.tx_hash); continue; }
       const amount = parseFloat(tx.value) / Math.pow(10, parseInt(tx.tokenDecimal));
