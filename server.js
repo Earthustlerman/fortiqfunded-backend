@@ -774,6 +774,7 @@ app.post('/check-payment', async (req, res) => {
 });
 
 cron.schedule('*/2 * * * *', checkPendingPayments);
+cron.schedule('*/2 * * * *', checkPendingBEP20Payments);
 cron.schedule('*/30 * * * * *', checkPendingLimitOrders);
 cron.schedule('0 0 * * *', async function() {
   console.log('Resetting daily loss...');
