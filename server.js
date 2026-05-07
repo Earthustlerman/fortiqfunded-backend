@@ -30,6 +30,7 @@ const TRONGRID_KEY = process.env.TRONGRID_API_KEY;
 const BSCSCAN_KEY = process.env.BSCSCAN_API_KEY;
 const BEP20_WALLET = '0xC5c3f3E0f9267701987ED62Bd715e61cfB8749F9';
 const USDC_BEP20_CONTRACT = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
+
 async function sendEmail(subject, text) {
   try {
     await resend.emails.send({
@@ -80,7 +81,9 @@ function emailWrapper(content) {
 </html>`;
 }
 
-function challengeActivatedEmail(traderName, accId, amount) {
+function challengeActivatedEmail(traderName, accId, amount, network) {
+  var currency = (network === 'BEP20') ? 'USDC' : 'USDT';
+  var networkLabel = (network === 'BEP20') ? 'USDC BEP20' : 'USDT TRC20';
   return emailWrapper(`
     <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(108,61,232,0.2);">
       <div style="font-size:28px;margin-bottom:8px;">🚀</div>
@@ -90,7 +93,7 @@ function challengeActivatedEmail(traderName, accId, amount) {
     <div style="padding:32px;">
       <p style="font-size:15px;color:#e8e6ff;margin:0 0 16px;">Hi ${traderName},</p>
       <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">
-        Your payment of <strong style="color:#e8e6ff;">$${amount} USDT</strong> has been confirmed and your challenge account is now active. You can start trading immediately!
+        Your payment of <strong style="color:#e8e6ff;">$${amount} ${currency}</strong> has been confirmed and your challenge account is now active. You can start trading immediately!
       </p>
       <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">${accId}</span></div>
@@ -158,7 +161,7 @@ function stage2ActivatedEmail(traderName, accId) {
         <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div>
       </div>
       <div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;">
-        <p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">💰 Trade freely — take profits whenever you like and request a payout from your dashboard at any time. Payouts are processed every Saturday in USDT TRC20.</p>
+        <p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">💰 Trade freely — take profits whenever you like and request a payout from your dashboard at any time. Payouts are processed every Saturday in USDT (TRC20) or USDC (BEP20).</p>
       </div>
       <div style="text-align:center;margin-bottom:24px;">
         <a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Start Trading Now →</a>
@@ -169,7 +172,7 @@ function stage2ActivatedEmail(traderName, accId) {
 
 async function checkPendingPayments() {
   console.log('Checking pending payments...');
-  const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending');
+  const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending').eq('network', 'TRC20');
   if (!payments || payments.length === 0) return;
 
   for (const payment of payments) {
@@ -295,14 +298,14 @@ async function activateChallenge(payment) {
   await supabase.from('accounts').upsert({
     user_id: payment.user_id, account_id: accId, account_type: 'challenge',
     status: 'active', stage: 1, balance: 5000, profit: 0,
-    daily_loss: 0, max_drawdown: 0, active_days: 0
+    daily_loss: 0, max_drawdown: 0, active_days: 0,
+    payment_network: payment.network || 'TRC20'
   }, { onConflict: 'account_id' });
 
   await supabase.from('payments').update({ status: 'confirmed', account_id: accId }).eq('id', payment.id);
   console.log('Challenge activated:', accId);
 
-  await sendEmail('New Challenge Activated — Fortiq Funded', 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nAccount ID: ' + accId + '\nAmount: $' + payment.amount + ' USDT');
-  // Auto-approve affiliate commission if this trader was referred
+  await sendEmail('New Challenge Activated — Fortiq Funded', 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nAccount ID: ' + accId + '\nAmount: $' + payment.amount + ' ' + (payment.network === 'BEP20' ? 'USDC' : 'USDT'));
   try {
     const { data: affiliate } = await supabase.from('affiliates').select('*').eq('referred_id', profile.user_id).eq('status', 'pending').single();
     if (affiliate) {
@@ -312,8 +315,9 @@ async function activateChallenge(payment) {
   } catch (e) {
     console.log('Affiliate approval check:', e.message);
   }
-  await sendTraderEmail(profile.email, '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId, challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2)));
+  await sendTraderEmail(profile.email, '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId, challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2), payment.network || 'TRC20'));
 }
+
 async function checkPendingBEP20Payments() {
   console.log('Checking pending BEP20 payments...');
   const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending').eq('network', 'BEP20');
@@ -346,6 +350,7 @@ async function checkPendingBEP20Payments() {
     }
   }
 }
+
 async function checkPendingLimitOrders() {
   try {
     const { data: orders } = await supabase.from('orders').select('*').eq('status', 'pending');
@@ -567,7 +572,7 @@ app.post('/close-position', async (req, res) => {
           const stage2AccId = 'FND-' + userNum;
           const { data: existing } = await supabase.from('accounts').select('account_id').eq('account_id', stage2AccId).single();
           if (!existing) {
-            await supabase.from('accounts').insert({ user_id, account_id: stage2AccId, account_type: 'funded', status: 'active', stage: 2, balance: 5000, profit: 0, daily_loss: 0, max_drawdown: 0, active_days: 0 });
+            await supabase.from('accounts').insert({ user_id, account_id: stage2AccId, account_type: 'funded', status: 'active', stage: 2, balance: 5000, profit: 0, daily_loss: 0, max_drawdown: 0, active_days: 0, payment_network: account.payment_network || 'TRC20' });
             await supabase.from('accounts').update({ status: 'funded', stage2_account_id: stage2AccId }).eq('account_id', account_id);
             await sendTraderEmail(profile.email, '🏆 You Are Now a Funded Trader — ' + stage2AccId, stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId));
             await sendEmail('Stage 2 Auto-Created — ' + stage2AccId, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + account_id + '\nStage 2: ' + stage2AccId);
@@ -599,7 +604,8 @@ app.post('/create-stage2', async (req, res) => {
     const stage2AccId = 'FND-' + userNum;
     const { data: existing } = await supabase.from('accounts').select('account_id').eq('account_id', stage2AccId).single();
     if (existing) return res.json({ success: true, stage2_account_id: stage2AccId, message: 'Already exists' });
-    await supabase.from('accounts').insert({ user_id, account_id: stage2AccId, account_type: 'funded', status: 'active', stage: 2, balance: 5000, profit: 0, daily_loss: 0, max_drawdown: 0, active_days: 0 });
+    const { data: stage1 } = await supabase.from('accounts').select('payment_network').eq('account_id', stage1_account_id).single();
+    await supabase.from('accounts').insert({ user_id, account_id: stage2AccId, account_type: 'funded', status: 'active', stage: 2, balance: 5000, profit: 0, daily_loss: 0, max_drawdown: 0, active_days: 0, payment_network: (stage1 && stage1.payment_network) || 'TRC20' });
     await supabase.from('accounts').update({ status: 'funded', stage2_account_id: stage2AccId }).eq('account_id', stage1_account_id);
     await sendTraderEmail(profile.email, '🏆 You Are Now a Funded Trader — ' + stage2AccId, stage2ActivatedEmail(profile.full_name || 'Trader', stage2AccId));
     await sendEmail('Stage 2 Funded Account Created — ' + stage2AccId, 'Trader: ' + profile.full_name + '\nEmail: ' + profile.email + '\nStage 1: ' + stage1_account_id + '\nStage 2: ' + stage2AccId);
@@ -641,13 +647,16 @@ app.post('/notify-payout', async (req, res) => {
   const { account_id, payout_amount, wallet_address } = req.body;
   if (!account_id || !payout_amount || !wallet_address) return res.status(400).json({ error: 'Missing required fields' });
   try {
-    const { data: account } = await supabase.from('accounts').select('user_id, profit').eq('account_id', account_id).single();
+    const { data: account } = await supabase.from('accounts').select('user_id, profit, payment_network').eq('account_id', account_id).single();
     if (!account) return res.status(404).json({ error: 'Account not found' });
     const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', account.user_id).single();
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
     const traderName = profile.full_name || 'Trader';
     const traderEmail = profile.email;
     const totalProfit = parseFloat(account.profit || 0).toFixed(2);
+    const payNet = account.payment_network || 'TRC20';
+    const payCurrency = payNet === 'BEP20' ? 'USDC' : 'USDT';
+    const payNetworkLabel = payNet === 'BEP20' ? 'USDC BEP20' : 'USDT TRC20';
     const traderHtml = emailWrapper(`
     <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
       <div style="font-size:28px;margin-bottom:8px;">🎉</div>
@@ -659,17 +668,17 @@ app.post('/notify-payout', async (req, res) => {
       <p style="font-size:14px;color:#7a7a9a;line-height:1.7;margin:0 0 24px;">Your 80% profit share has been sent to your wallet.</p>
       <div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">${account_id}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Total Profit</span><span style="color:#00d68f;font-family:monospace;font-size:13px;">$${totalProfit} USDT</span></div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Your Share (80%)</span><span style="color:#c9a84c;font-family:monospace;font-size:16px;font-weight:700;">$${payout_amount} USDT</span></div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Payment Method</span><span style="color:#e8e6ff;font-size:13px;">USDT TRC20</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Total Profit</span><span style="color:#00d68f;font-family:monospace;font-size:13px;">$${totalProfit} ${payCurrency}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Your Share (80%)</span><span style="color:#c9a84c;font-family:monospace;font-size:16px;font-weight:700;">$${payout_amount} ${payCurrency}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Payment Method</span><span style="color:#e8e6ff;font-size:13px;">${payNetworkLabel}</span></div>
         <div style="padding:10px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet Address</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">${wallet_address}</span></div>
       </div>
       <div style="text-align:center;margin-bottom:24px;">
         <a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge →</a>
       </div>
     </div>`);
-    await sendTraderEmail(traderEmail, '🎉 Your Fortiq Funded Payout Has Been Sent — $' + payout_amount + ' USDT', traderHtml);
-    await sendEmail('Payout Processed — ' + account_id, 'Account: ' + account_id + '\nTrader: ' + traderName + '\nEmail: ' + traderEmail + '\nAmount: $' + payout_amount + ' USDT\nWallet: ' + wallet_address + '\nTotal Profit: $' + totalProfit + ' USDT');
+    await sendTraderEmail(traderEmail, '🎉 Your Fortiq Funded Payout Has Been Sent — $' + payout_amount + ' ' + payCurrency, traderHtml);
+    await sendEmail('Payout Processed — ' + account_id, 'Account: ' + account_id + '\nTrader: ' + traderName + '\nEmail: ' + traderEmail + '\nAmount: $' + payout_amount + ' ' + payCurrency + '\nNetwork: ' + payNetworkLabel + '\nWallet: ' + wallet_address + '\nTotal Profit: $' + totalProfit + ' ' + payCurrency);
     res.json({ success: true });
   } catch (err) {
     console.log('Payout notification error:', err.message);
@@ -703,6 +712,7 @@ app.get('/leaderboard', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 app.post('/verify-recaptcha', async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ success: false });
@@ -718,6 +728,7 @@ app.post('/verify-recaptcha', async (req, res) => {
     res.status(500).json({ success: false });
   }
 });
+
 app.post('/track-referral', async (req, res) => {
   const { referrer_code, referred_user_id } = req.body;
   console.log('Track referral called:', referrer_code, '->', referred_user_id);
@@ -745,6 +756,7 @@ app.post('/track-referral', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 app.post('/submit-payout-wallet', async (req, res) => {
   const { account_id, wallet, user_id } = req.body;
   if (!account_id || !wallet || !user_id) return res.status(400).json({ error: 'Missing fields' });
@@ -768,6 +780,7 @@ app.post('/submit-affiliate-wallet', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 app.post('/check-payment', async (req, res) => {
   await checkPendingPayments();
   res.json({ message: 'Check triggered' });
