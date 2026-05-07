@@ -27,7 +27,6 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const TRONGRID_KEY = process.env.TRONGRID_API_KEY;
-const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY;
 const BEP20_WALLET = '0xC5c3f3E0f9267701987ED62Bd715e61cfB8749F9';
 const USDC_BEP20_CONTRACT = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
 
@@ -83,7 +82,6 @@ function emailWrapper(content) {
 
 function challengeActivatedEmail(traderName, accId, amount, network) {
   var currency = (network === 'BEP20') ? 'USDC' : 'USDT';
-  var networkLabel = (network === 'BEP20') ? 'USDC BEP20' : 'USDT TRC20';
   return emailWrapper(`
     <div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(108,61,232,0.2);">
       <div style="font-size:28px;margin-bottom:8px;">🚀</div>
@@ -322,29 +320,81 @@ async function checkPendingBEP20Payments() {
   console.log('Checking pending BEP20 payments...');
   const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending').eq('network', 'BEP20');
   if (!payments || payments.length === 0) return;
+
   for (const payment of payments) {
     try {
-      const url = 'https://api.etherscan.io/v2/api?chainid=56&module=account&action=tokentx&contractaddress=' + USDC_BEP20_CONTRACT + '&address=' + BEP20_WALLET + '&startblock=0&endblock=99999999&sort=desc&apikey=' + ETHERSCAN_KEY;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!data.result || data.status === '0') { console.log('BSCScan error or no transactions found:', JSON.stringify(data)); continue; }
-      const tx = data.result.find(function(t) { return t.hash.toLowerCase() === payment.tx_hash.toLowerCase(); });
-      if (!tx) { console.log('BEP20 TX not found yet:', payment.tx_hash); continue; }
-      const amount = parseFloat(tx.value) / Math.pow(10, parseInt(tx.tokenDecimal));
-      const confirmations = parseInt(tx.confirmations) || 0;
-      console.log('BEP20 TX found:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+      const rpcRes = await fetch('https://bsc-dataseed.binance.org/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getTransactionReceipt',
+          params: [payment.tx_hash],
+          id: 1
+        })
+      });
+      const rpcData = await rpcRes.json();
+
+      if (!rpcData.result) {
+        console.log('BEP20 TX not found yet:', payment.tx_hash);
+        continue;
+      }
+
+      const receipt = rpcData.result;
+
+      const blockRes = await fetch('https://bsc-dataseed.binance.org/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_blockNumber',
+          params: [],
+          id: 1
+        })
+      });
+      const blockData = await blockRes.json();
+      const currentBlock = parseInt(blockData.result, 16);
+      const txBlock = parseInt(receipt.blockNumber, 16);
+      const confirmations = currentBlock - txBlock;
+
+      console.log('BEP20 TX found:', payment.tx_hash, '| Confirmations:', confirmations);
+
+      let amount = 0;
+      const USDC_CONTRACT = USDC_BEP20_CONTRACT.toLowerCase();
+      const WALLET = BEP20_WALLET.toLowerCase();
+
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() === USDC_CONTRACT) {
+          if (log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef') {
+            const to = '0x' + log.topics[2].slice(26);
+            if (to.toLowerCase() === WALLET) {
+              amount = parseInt(log.data, 16) / Math.pow(10, 18);
+              console.log('BEP20 USDC amount:', amount);
+            }
+          }
+        }
+      }
+
+      if (amount === 0) {
+        console.log('BEP20 TX found but no USDC transfer to our wallet detected');
+        continue;
+      }
+
       await supabase.from('payments').update({ confirmations, amount }).eq('id', payment.id);
+
       if (amount < 148) {
         console.log('BEP20 amount too low:', amount);
         await supabase.from('payments').update({ status: 'insufficient' }).eq('id', payment.id);
         await sendEmail('BEP20 Payment Below Minimum — Fortiq Funded', 'TX Hash: ' + payment.tx_hash + '\nAmount: $' + amount + ' USDC\nUser ID: ' + payment.user_id);
         continue;
       }
+
       if (confirmations >= 15) {
         await activateChallenge(payment);
       } else {
         console.log('BEP20 TX found but not enough confirmations yet:', confirmations);
       }
+
     } catch (err) {
       console.log('Error checking BEP20 TX:', payment.tx_hash, err.message);
     }
