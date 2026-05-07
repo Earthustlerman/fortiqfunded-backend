@@ -27,7 +27,7 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const TRONGRID_KEY = process.env.TRONGRID_API_KEY;
-const BSCSCAN_KEY = process.env.BSCSCAN_API_KEY;
+const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY;
 const BEP20_WALLET = '0xC5c3f3E0f9267701987ED62Bd715e61cfB8749F9';
 const USDC_BEP20_CONTRACT = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
 
