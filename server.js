@@ -314,7 +314,38 @@ async function activateChallenge(payment) {
   }
   await sendTraderEmail(profile.email, '🚀 Your Fortiq Funded Challenge is Now Active — ' + accId, challengeActivatedEmail(profile.full_name || 'Trader', accId, parseFloat(payment.amount).toFixed(2)));
 }
-
+async function checkPendingBEP20Payments() {
+  console.log('Checking pending BEP20 payments...');
+  const { data: payments } = await supabase.from('payments').select('*').eq('status', 'pending').eq('network', 'BEP20');
+  if (!payments || payments.length === 0) return;
+  for (const payment of payments) {
+    try {
+      const url = 'https://api.bscscan.com/api?module=account&action=tokentx&contractaddress=' + USDC_BEP20_CONTRACT + '&address=' + BEP20_WALLET + '&startblock=0&endblock=99999999&sort=desc&apikey=' + BSCSCAN_KEY;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.result || data.status === '0') { console.log('BSCScan error or no transactions found'); continue; }
+      const tx = data.result.find(function(t) { return t.hash.toLowerCase() === payment.tx_hash.toLowerCase(); });
+      if (!tx) { console.log('BEP20 TX not found yet:', payment.tx_hash); continue; }
+      const amount = parseFloat(tx.value) / Math.pow(10, parseInt(tx.tokenDecimal));
+      const confirmations = parseInt(tx.confirmations) || 0;
+      console.log('BEP20 TX found:', payment.tx_hash, '| Amount:', amount, '| Confirmations:', confirmations);
+      await supabase.from('payments').update({ confirmations, amount }).eq('id', payment.id);
+      if (amount < 148) {
+        console.log('BEP20 amount too low:', amount);
+        await supabase.from('payments').update({ status: 'insufficient' }).eq('id', payment.id);
+        await sendEmail('BEP20 Payment Below Minimum — Fortiq Funded', 'TX Hash: ' + payment.tx_hash + '\nAmount: $' + amount + ' USDC\nUser ID: ' + payment.user_id);
+        continue;
+      }
+      if (confirmations >= 15) {
+        await activateChallenge(payment);
+      } else {
+        console.log('BEP20 TX found but not enough confirmations yet:', confirmations);
+      }
+    } catch (err) {
+      console.log('Error checking BEP20 TX:', payment.tx_hash, err.message);
+    }
+  }
+}
 async function checkPendingLimitOrders() {
   try {
     const { data: orders } = await supabase.from('orders').select('*').eq('status', 'pending');
