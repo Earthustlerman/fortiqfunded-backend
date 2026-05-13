@@ -157,8 +157,9 @@ async function checkPendingLimitOrders() {
     for(const order of orders){
       try{
         let currentPrice=null;
-        try{const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),3000);const res=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+order.symbol,{signal:ctrl.signal});clearTimeout(t);const d=await res.json();if(d.price)currentPrice=parseFloat(d.price);}catch(e){}
-        if(!currentPrice){try{const res2=await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol='+order.symbol);const d2=await res2.json();if(d2.price)currentPrice=parseFloat(d2.price);}catch(e){}}
+        try{const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),3000);const res=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+order.symbol,{signal:ctrl.signal});clearTimeout(t);const d=await res.json();if(d.price)currentPrice=parseFloat(d.price);}catch(e){console.log('Limit order price fetch error (Binance spot):',e.message);}
+        if(!currentPrice){try{const res2=await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol='+order.symbol);const d2=await res2.json();if(d2.price)currentPrice=parseFloat(d2.price);}catch(e){console.log('Limit order price fetch error (Binance futures):',e.message);}}
+        console.log('Limit order check:',order.id,'symbol:',order.symbol,'currentPrice:',currentPrice,'limitPrice:',order.limit_price);
         if(!currentPrice) continue;
         const lp=parseFloat(order.limit_price);
         if(!((order.direction==='long'&&currentPrice<=lp)||(order.direction==='short'&&currentPrice>=lp))) continue;
@@ -196,15 +197,16 @@ app.post('/open-position',async(req,res)=>{
 });
 
 app.post('/close-position',async(req,res)=>{
-  const{position_id,account_id,user_id}=req.body;
+  const{position_id,account_id,user_id,exit_price}=req.body;
   if(!position_id||!account_id||!user_id)return res.status(400).json({error:'Missing fields'});
   try{
     const{data:position}=await supabase.from('positions').select('*').eq('id',position_id).eq('account_id',account_id).eq('user_id',user_id).eq('status','open').single();
     if(!position)return res.status(404).json({error:'Position not found'});
     const{data:account}=await supabase.from('accounts').select('*').eq('account_id',account_id).eq('status','active').single();
     if(!account||account.user_id!==user_id)return res.status(403).json({error:'Unauthorised'});
-    let exitPrice=null;
-    try{const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+position.symbol);const d=await r.json();if(d.price)exitPrice=parseFloat(d.price);}catch(e){}
+    // Use price sent from terminal (live WebSocket price) — fall back to API if not provided
+    let exitPrice=exit_price?parseFloat(exit_price):null;
+    if(!exitPrice){try{const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+position.symbol);const d=await r.json();if(d.price)exitPrice=parseFloat(d.price);}catch(e){}}
     if(!exitPrice){try{const r=await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol='+position.symbol);const d=await r.json();if(d.price)exitPrice=parseFloat(d.price);}catch(e){}}
     if(!exitPrice){try{const coinMap={'BTCUSDT':'bitcoin','ETHUSDT':'ethereum','SOLUSDT':'solana','XRPUSDT':'ripple','ADAUSDT':'cardano','DOGEUSDT':'dogecoin'};const coinId=coinMap[position.symbol]||'bitcoin';const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+coinId+'&vs_currencies=usd');const d=await r.json();if(d[coinId])exitPrice=d[coinId].usd;}catch(e){}}
     if(!exitPrice)return res.status(500).json({error:'Could not fetch price'});
