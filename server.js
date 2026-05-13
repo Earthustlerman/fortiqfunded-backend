@@ -140,7 +140,7 @@ async function activateChallenge(payment) {
   const {data:profile,error:profErr}=await supabase.from('profiles').select('user_id,full_name,email').eq('id',payment.user_id).single();
   if(profErr||!profile){console.log('activateChallenge: profile not found for user_id:',payment.user_id,profErr);return;}
   const accId='ACC-'+profile.user_id.replace('USR-','');
-  const {data:existing}=await supabase.from('accounts').select('account_id,status').eq('account_id',accId).single().catch(()=>({data:null}));
+  let existing=null;try{const r=await supabase.from('accounts').select('account_id,status').eq('account_id',accId).single();existing=r.data;}catch(e){}
   if(existing&&existing.status==='active'){await supabase.from('payments').update({status:'confirmed',account_id:accId}).eq('id',payment.id);return;}
   const {error:accErr}=await supabase.from('accounts').upsert({user_id:payment.user_id,account_id:accId,account_type:'challenge',status:'active',stage:1,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:payment.network||'TRC20'},{onConflict:'account_id'});
   if(accErr){console.log('activateChallenge: account upsert failed:',accErr.message);return;}
@@ -233,7 +233,7 @@ app.post('/close-position',async(req,res)=>{
         const{data:profile}=await supabase.from('profiles').select('user_id,full_name,email').eq('id',user_id).single();
         if(profile){
           const stage2AccId='FND-'+profile.user_id.replace('USR-','');
-          const{data:existing}=await supabase.from('accounts').select('account_id').eq('account_id',stage2AccId).single().catch(()=>({data:null}));
+          let existing=null;try{const r=await supabase.from('accounts').select('account_id').eq('account_id',stage2AccId).single();existing=r.data;}catch(e){}
           if(!existing){
             await supabase.from('accounts').insert({user_id,account_id:stage2AccId,account_type:'funded',status:'active',stage:2,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:account.payment_network||'TRC20'});
             await supabase.from('accounts').update({status:'funded',stage2_account_id:stage2AccId}).eq('account_id',account_id);
@@ -258,7 +258,7 @@ app.post('/submit-balance-payment',async(req,res)=>{
     if(!account||account.user_id!==user_id)return res.status(403).json({error:'Unauthorised'});
     if(!account.payout_wallet)return res.status(400).json({error:'Please enter your payout wallet address first'});
     if(parseFloat(account.profit||0)<=0)return res.status(400).json({error:'No profit to pay out'});
-    const{data:dup}=await supabase.from('payments').select('id,status').eq('tx_hash',tx_hash).single().catch(()=>({data:null}));
+    let dup=null;try{const r=await supabase.from('payments').select('id,status').eq('tx_hash',tx_hash).single();dup=r.data;}catch(e){}
     if(dup)return res.json({success:true,message:'Already submitted',status:dup.status});
     await supabase.from('payments').insert({user_id,account_id,tx_hash,amount:0,status:'pending',confirmations:0,network,payment_type:'payout_balance'});
     await supabase.from('accounts').update({payout_balance_pending:true}).eq('account_id',account_id);
@@ -328,8 +328,8 @@ app.post('/create-stage2',async(req,res)=>{
   try{
     const{data:profile}=await supabase.from('profiles').select('user_id,full_name,email').eq('id',user_id).single();if(!profile)return res.status(404).json({error:'Profile not found'});
     const stage2AccId='FND-'+profile.user_id.replace('USR-','');
-    const{data:existing}=await supabase.from('accounts').select('account_id').eq('account_id',stage2AccId).single().catch(()=>({data:null}));if(existing)return res.json({success:true,stage2_account_id:stage2AccId,message:'Already exists'});
-    const{data:stage1}=await supabase.from('accounts').select('payment_network').eq('account_id',stage1_account_id).single().catch(()=>({data:null}));
+    let existing=null;try{const r=await supabase.from('accounts').select('account_id').eq('account_id',stage2AccId).single();existing=r.data;}catch(e){}if(existing)return res.json({success:true,stage2_account_id:stage2AccId,message:'Already exists'});
+    let stage1=null;try{const r=await supabase.from('accounts').select('payment_network').eq('account_id',stage1_account_id).single();stage1=r.data;}catch(e){}
     await supabase.from('accounts').insert({user_id,account_id:stage2AccId,account_type:'funded',status:'active',stage:2,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:(stage1&&stage1.payment_network)||'TRC20'});
     await supabase.from('accounts').update({status:'funded',stage2_account_id:stage2AccId}).eq('account_id',stage1_account_id);
     await sendTraderEmail(profile.email,'🏆 You Are Now Funded — '+stage2AccId,stage2ActivatedEmail(profile.full_name||'Trader',stage2AccId));
