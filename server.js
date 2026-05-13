@@ -142,8 +142,7 @@ async function activateChallenge(payment) {
   const accId='ACC-'+profile.user_id.replace('USR-','');
   const {data:existing}=await supabase.from('accounts').select('account_id,status').eq('account_id',accId).single().catch(()=>({data:null}));
   if(existing&&existing.status==='active'){await supabase.from('payments').update({status:'confirmed',account_id:accId}).eq('id',payment.id);return;}
-  // Use profile.user_id (USR-format) to match what accounts table expects
-  const {error:accErr}=await supabase.from('accounts').upsert({user_id:profile.user_id,account_id:accId,account_type:'challenge',status:'active',stage:1,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:payment.network||'TRC20'},{onConflict:'account_id'});
+  const {error:accErr}=await supabase.from('accounts').upsert({user_id:payment.user_id,account_id:accId,account_type:'challenge',status:'active',stage:1,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:payment.network||'TRC20'},{onConflict:'account_id'});
   if(accErr){console.log('activateChallenge: account upsert failed:',accErr.message);return;}
   await supabase.from('payments').update({status:'confirmed',account_id:accId}).eq('id',payment.id);
   console.log('Challenge activated:',accId);
