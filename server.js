@@ -137,12 +137,14 @@ async function confirmBalancePayment(payment) {
 }
 
 async function activateChallenge(payment) {
-  const {data:profile}=await supabase.from('profiles').select('user_id,full_name,email').eq('id',payment.user_id).single();
-  if(!profile) return;
+  const {data:profile,error:profErr}=await supabase.from('profiles').select('user_id,full_name,email').eq('id',payment.user_id).single();
+  if(profErr||!profile){console.log('activateChallenge: profile not found for user_id:',payment.user_id,profErr);return;}
   const accId='ACC-'+profile.user_id.replace('USR-','');
   const {data:existing}=await supabase.from('accounts').select('account_id,status').eq('account_id',accId).single().catch(()=>({data:null}));
   if(existing&&existing.status==='active'){await supabase.from('payments').update({status:'confirmed',account_id:accId}).eq('id',payment.id);return;}
-  await supabase.from('accounts').upsert({user_id:payment.user_id,account_id:accId,account_type:'challenge',status:'active',stage:1,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:payment.network||'TRC20'},{onConflict:'account_id'});
+  // Use profile.user_id (USR-format) to match what accounts table expects
+  const {error:accErr}=await supabase.from('accounts').upsert({user_id:profile.user_id,account_id:accId,account_type:'challenge',status:'active',stage:1,balance:5000,profit:0,daily_loss:0,max_drawdown:0,active_days:0,payment_network:payment.network||'TRC20'},{onConflict:'account_id'});
+  if(accErr){console.log('activateChallenge: account upsert failed:',accErr.message);return;}
   await supabase.from('payments').update({status:'confirmed',account_id:accId}).eq('id',payment.id);
   console.log('Challenge activated:',accId);
   await sendEmail('New Challenge Activated','Trader: '+profile.full_name+'\nEmail: '+profile.email+'\nAccount: '+accId+'\nEntry: $'+payment.amount+' '+(payment.network==='BEP20'?'USDC':'USDT'));
