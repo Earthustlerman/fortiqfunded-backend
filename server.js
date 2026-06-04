@@ -107,7 +107,9 @@ async function activateChallenge(payment) {
 
   // AFFILIATE: check if this user was referred
   try {
-    const {data:referral}=await supabase.from('affiliates').select('*').eq('referred_id',profile.user_id).eq('status','pending').single();
+    const {data:referrals}=await supabase.from('affiliates').select('*').eq('referred_id',profile.user_id).eq('status','pending');
+    const referral=referrals&&referrals.length>0?referrals[0]:null;
+    console.log('Affiliate check for',profile.user_id,'- found:',referral?referral.id:'none');
     if(referral){
       // Mark commission as approved and queue for payout
       await supabase.from('affiliates').update({status:'approved',commission:AFFILIATE_COMMISSION,payment_network:payment.network||'TRC20'}).eq('id',referral.id);
