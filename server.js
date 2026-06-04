@@ -16,9 +16,9 @@ const BEP20_WALLET = '0xC5c3f3E0f9267701987ED62Bd715e61cfB8749F9';
 const USDC_BEP20_CONTRACT = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
 
 // PAYMENT THRESHOLDS
-const INITIAL_MIN_TRC20 = 4.50;  // $6 advertised, min $4.50 received
-const INITIAL_MIN_BEP20 = 5.50;  // $6 advertised, min $5.50 received
-const BALANCE_MIN = 142;          // $144 advertised, min $142 received
+const INITIAL_MIN_TRC20 = 48;   // $50 advertised, min $48 received
+const INITIAL_MIN_BEP20 = 49;   // $50 advertised, min $49 received
+const AFFILIATE_COMMISSION = 25; // $25 per verified referral
 
 async function sendEmail(subject, text) {
   try { await resend.emails.send({ from: 'Fortiq Funded <support@fortiqfunded.com>', to: 'support@fortiqfunded.com', subject, text }); } catch(e) {}
@@ -36,20 +36,20 @@ function emailWrapper(content) {
 
 function challengeActivatedEmail(traderName, accId, amount, network) {
   var cur = network === 'BEP20' ? 'USDC' : 'USDT';
-  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(108,61,232,0.2);"><div style="font-size:28px">🚀</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#a78bfa;margin:8px 0 0;">Challenge Activated!</h1></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Entry payment of <strong style="color:#e8e6ff;">$' + amount + ' ' + cur + '</strong> confirmed. Your challenge is live!</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">' + accId + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account Size</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">$5,000 USDT</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Profit Target</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Daily Loss Limit</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5% ($250)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Min Active Days</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5 Days</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;">Your Profits</span><span style="color:#00d68f;font-size:13px;font-weight:700;">100% Yours</span></div></div><div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;"><p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;">When you pass and request your payout, simply pay the remaining $144 balance. You only pay the full fee if you succeed!</p></div><div style="text-align:center;"><a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Open Trading Terminal</a></div></div>');
+  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(108,61,232,0.2);"><div style="font-size:28px">🚀</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#a78bfa;margin:8px 0 0;">Challenge Activated!</h1></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Your challenge payment of <strong style="color:#e8e6ff;">$' + amount + ' ' + cur + '</strong> has been confirmed. Your challenge is now live!</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account ID</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">' + accId + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account Size</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">$5,000 USDT</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Profit Target</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Daily Loss Limit</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5% ($250)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Max Drawdown</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">8% ($400)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Min Active Days</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">5 Days</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;">Your Profits</span><span style="color:#00d68f;font-size:13px;font-weight:700;">100% Yours</span></div></div><div style="text-align:center;"><a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Open Trading Terminal</a></div></div>');
 }
 
 function challengeFailedEmail(traderName, accId, reason) {
-  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(240,61,61,0.2);"><div style="font-size:28px">❌</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f03d3d;margin:8px 0 0;">Account Failed</h1></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Account <strong style="color:#e8e6ff;">' + accId + '</strong> failed. ' + (reason ? 'Reason: <strong style="color:#e8e6ff;">' + reason + '</strong>' : '') + '</p><div style="background:rgba(240,61,61,0.06);border:1px solid rgba(240,61,61,0.2);border-radius:10px;padding:16px;margin-bottom:24px;"><p style="font-size:13px;color:#f03d3d;margin:0;">Review your strategy and try again for just $6.</p></div><div style="text-align:center;"><a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Try Again — Only $6</a></div></div>');
+  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(240,61,61,0.2);"><div style="font-size:28px">❌</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f03d3d;margin:8px 0 0;">Account Failed</h1></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Account <strong style="color:#e8e6ff;">' + accId + '</strong> failed. ' + (reason ? 'Reason: <strong style="color:#e8e6ff;">' + reason + '</strong>' : '') + '</p><div style="background:rgba(240,61,61,0.06);border:1px solid rgba(240,61,61,0.2);border-radius:10px;padding:16px;margin-bottom:24px;"><p style="font-size:13px;color:#f03d3d;margin:0;">Review your strategy and try again for just $50.</p></div><div style="text-align:center;"><a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Try Again — Only $50</a></div></div>');
 }
 
 function stage2ActivatedEmail(traderName, accId) {
-  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);"><div style="font-size:28px">🏆</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#c9a84c;margin:8px 0 0;">You\'re Now Funded!</h1><p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Stage 2 — Funded Account Activated</p></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Congratulations! Keep <strong style="color:#00d68f;">100% of every dollar you earn</strong>.</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Funded Account ID</span><span style="color:#c9a84c;font-family:monospace;font-size:13px;">' + accId + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account Size</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">$5,000 USDT</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Your Profits</span><span style="color:#00d68f;font-size:13px;font-weight:700;">100% Yours</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;">Max Profit Cap</span><span style="color:#c9a84c;font-size:13px;font-weight:600;">$5,000 USDT</span></div></div><div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;"><p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;"><strong>To request your payout:</strong> Close all positions, enter your wallet in your dashboard, then pay the $144 challenge balance. We verify it on-chain and send your full profit every Saturday.</p></div><div style="text-align:center;"><a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Start Trading Now →</a></div></div>');
+  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);"><div style="font-size:28px">🏆</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#c9a84c;margin:8px 0 0;">You\'re Now Funded!</h1><p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Stage 2 — Funded Account Activated</p></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Congratulations! You passed the challenge. Keep <strong style="color:#00d68f;">100% of every dollar you earn</strong>.</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Funded Account ID</span><span style="color:#c9a84c;font-family:monospace;font-size:13px;">' + accId + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account Size</span><span style="color:#e8e6ff;font-size:13px;font-weight:600;">$5,000 USDT</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Your Profits</span><span style="color:#00d68f;font-size:13px;font-weight:700;">100% Yours</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;">Max Profit Cap</span><span style="color:#c9a84c;font-size:13px;font-weight:600;">$5,000 USDT</span></div></div><div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px;margin-bottom:24px;"><p style="font-size:13px;color:#c9a84c;margin:0;line-height:1.6;"><strong>To request your payout:</strong> Close all positions, enter your wallet in your dashboard, then click Request Payout. We send your full profit every Saturday.</p></div><div style="text-align:center;"><a href="https://fortiqfunded.com/terminal.html" style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#000;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:700;font-size:14px;">Start Trading Now →</a></div></div>');
 }
 
-function balancePaymentReceivedEmail(traderName, accId, profit, wallet, network) {
+function affiliateRewardEmail(referrerName, referredName, commission, network) {
   var cur = network === 'BEP20' ? 'USDC' : 'USDT';
-  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);"><div style="font-size:28px">⏳</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#c9a84c;margin:8px 0 0;">Balance Payment Confirmed</h1><p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">Payout queued for this Saturday</p></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + traderName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Your $144 balance payment is confirmed. Your payout will be sent this Saturday.</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account</span><span style="color:#c9a84c;font-family:monospace;font-size:13px;">' + accId + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Profit</span><span style="color:#00d68f;font-size:13px;">$' + parseFloat(profit).toFixed(2) + ' ' + cur + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;">Split</span><span style="color:#00d68f;font-size:13px;font-weight:700;">100% Yours</span></div></div></div>');
+  return emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);"><div style="font-size:28px">🎁</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#c9a84c;margin:8px 0 0;">Referral Reward Earned!</h1></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 16px;">Hi ' + referrerName + ',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Your referral <strong style="color:#e8e6ff;">' + referredName + '</strong> just purchased a challenge. Your <strong style="color:#c9a84c;">$' + commission + ' ' + cur + '</strong> commission will be paid out this Saturday.</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Referred Trader</span><span style="color:#e8e6ff;font-size:13px;">' + referredName + '</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;">Your Commission</span><span style="color:#c9a84c;font-size:13px;font-weight:700;">$' + commission + ' ' + cur + '</span></div></div><p style="color:#7a7a9a;font-size:13px;line-height:1.7;">Make sure your payout wallet is set in your dashboard to receive your commission this Saturday.</p></div>');
 }
 
 // CHECK TRC20 INITIAL PAYMENTS
@@ -64,7 +64,7 @@ async function checkPendingPayments() {
       if (!found) { try { const res3=await fetch('https://apilist.tronscanapi.com/api/transaction-info?hash='+payment.tx_hash,{headers:{'TRON-PRO-API-KEY':TRONGRID_KEY}}); const data3=await res3.json(); if(data3&&data3.trc20TransferInfo&&data3.trc20TransferInfo.length>0){amount=parseInt(data3.trc20TransferInfo[0].amount_str||data3.trc20TransferInfo[0].amount||'0')/1000000;confirmations=data3.confirmations||999;if(amount>0)found=true;} } catch(e) {} }
       if (!found||amount===0) continue;
       await supabase.from('payments').update({confirmations,amount}).eq('id',payment.id);
-      if (amount<INITIAL_MIN_TRC20) { await supabase.from('payments').update({status:'insufficient'}).eq('id',payment.id); await sendEmail('TRC20 Initial Payment Below Min','TX:'+payment.tx_hash+'\nAmt:$'+amount+'\nMin:$'+INITIAL_MIN_TRC20); continue; }
+      if (amount<INITIAL_MIN_TRC20) { await supabase.from('payments').update({status:'insufficient'}).eq('id',payment.id); await sendEmail('TRC20 Payment Below Min','TX:'+payment.tx_hash+'\nAmt:$'+amount+'\nMin:$'+INITIAL_MIN_TRC20); continue; }
       if (confirmations>=19||confirmations===999) await activateChallenge(payment);
     } catch(err) { console.log('TRC20 check error:',err.message); }
   }
@@ -86,54 +86,10 @@ async function checkPendingBEP20Payments() {
       for(const log of receipt.logs){if(log.address.toLowerCase()===USDC_BEP20_CONTRACT.toLowerCase()&&log.topics[0]==='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'){const to='0x'+log.topics[2].slice(26);if(to.toLowerCase()===BEP20_WALLET.toLowerCase()){amount=parseInt(log.data,16)/Math.pow(10,18);}}}
       if(amount===0) continue;
       await supabase.from('payments').update({confirmations,amount}).eq('id',payment.id);
-      if(amount<INITIAL_MIN_BEP20){await supabase.from('payments').update({status:'insufficient'}).eq('id',payment.id);await sendEmail('BEP20 Initial Payment Below Min','TX:'+payment.tx_hash+'\nAmt:$'+amount+'\nMin:$'+INITIAL_MIN_BEP20);continue;}
+      if(amount<INITIAL_MIN_BEP20){await supabase.from('payments').update({status:'insufficient'}).eq('id',payment.id);await sendEmail('BEP20 Payment Below Min','TX:'+payment.tx_hash+'\nAmt:$'+amount+'\nMin:$'+INITIAL_MIN_BEP20);continue;}
       if(confirmations>=15) await activateChallenge(payment);
     } catch(err) { console.log('BEP20 check error:',err.message); }
   }
-}
-
-// CHECK BALANCE PAYMENTS ($144 payout balance)
-async function checkPendingBalancePayments() {
-  const { data: payments } = await supabase.from('payments').select('*').eq('status','pending').eq('payment_type','payout_balance');
-  if (!payments||!payments.length) return;
-  for (const payment of payments) {
-    try {
-      let amount=0, confirmations=0, found=false;
-      if (payment.network==='TRC20') {
-        try { const res=await fetch('https://api.trongrid.io/v1/transactions/'+payment.tx_hash,{headers:{'TRON-PRO-API-KEY':TRONGRID_KEY}}); const data=await res.json(); if(data.data&&data.data.length>0){const tx=data.data[0];confirmations=tx.confirmations||0;if(tx.trc20_transfers&&tx.trc20_transfers.length>0){amount=parseInt(tx.trc20_transfers[0].amount_str||'0')/1000000;if(amount>0)found=true;}} } catch(e) {}
-        if (!found) { try { const res3=await fetch('https://apilist.tronscanapi.com/api/transaction-info?hash='+payment.tx_hash,{headers:{'TRON-PRO-API-KEY':TRONGRID_KEY}}); const data3=await res3.json(); if(data3&&data3.trc20TransferInfo&&data3.trc20TransferInfo.length>0){amount=parseInt(data3.trc20TransferInfo[0].amount_str||data3.trc20TransferInfo[0].amount||'0')/1000000;confirmations=data3.confirmations||999;if(amount>0)found=true;} } catch(e) {} }
-        if (!found||amount===0) continue;
-        await supabase.from('payments').update({confirmations,amount}).eq('id',payment.id);
-        if(amount<BALANCE_MIN){await supabase.from('payments').update({status:'insufficient'}).eq('id',payment.id);await sendEmail('Balance TRC20 Below Min','TX:'+payment.tx_hash+'\nAmt:$'+amount+'\nAcct:'+payment.account_id);continue;}
-        if(confirmations>=19||confirmations===999) await confirmBalancePayment(payment);
-      } else if (payment.network==='BEP20') {
-        const rpcRes=await fetch('https://bsc-dataseed.binance.org/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_getTransactionReceipt',params:[payment.tx_hash],id:1})});
-        const rpcData=await rpcRes.json(); if(!rpcData.result) continue;
-        const receipt=rpcData.result;
-        const blockRes=await fetch('https://bsc-dataseed.binance.org/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_blockNumber',params:[],id:1})});
-        const blockData=await blockRes.json();
-        confirmations=parseInt(blockData.result,16)-parseInt(receipt.blockNumber,16);
-        for(const log of receipt.logs){if(log.address.toLowerCase()===USDC_BEP20_CONTRACT.toLowerCase()&&log.topics[0]==='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'){const to='0x'+log.topics[2].slice(26);if(to.toLowerCase()===BEP20_WALLET.toLowerCase()){amount=parseInt(log.data,16)/Math.pow(10,18);found=true;}}}
-        if(!found||amount===0) continue;
-        await supabase.from('payments').update({confirmations,amount}).eq('id',payment.id);
-        if(amount<BALANCE_MIN){await supabase.from('payments').update({status:'insufficient'}).eq('id',payment.id);await sendEmail('Balance BEP20 Below Min','TX:'+payment.tx_hash+'\nAmt:$'+amount+'\nAcct:'+payment.account_id);continue;}
-        if(confirmations>=15) await confirmBalancePayment(payment);
-      }
-    } catch(err) { console.log('Balance payment check error:',err.message); }
-  }
-}
-
-async function confirmBalancePayment(payment) {
-  console.log('Balance payment confirmed:',payment.account_id);
-  await supabase.from('payments').update({status:'confirmed'}).eq('id',payment.id);
-  await supabase.from('accounts').update({balance_paid:true,payout_balance_pending:false}).eq('account_id',payment.account_id);
-  const {data:account}=await supabase.from('accounts').select('user_id,profit,payout_wallet,payment_network').eq('account_id',payment.account_id).single();
-  if(!account) return;
-  const {data:profile}=await supabase.from('profiles').select('full_name,email').eq('id',account.user_id).single();
-  if(!profile) return;
-  const network=account.payment_network||'TRC20', currency=network==='BEP20'?'USDC':'USDT';
-  await sendTraderEmail(profile.email,'✅ Balance Payment Confirmed — Payout Queued — '+payment.account_id,balancePaymentReceivedEmail(profile.full_name||'Trader',payment.account_id,account.profit,account.payout_wallet,network));
-  await sendEmail('💰 PAYOUT READY — '+payment.account_id,'Account: '+payment.account_id+'\nTrader: '+profile.full_name+'\nEmail: '+profile.email+'\nProfit (100%): $'+parseFloat(account.profit||0).toFixed(2)+' '+currency+'\nWallet: '+account.payout_wallet+'\nNetwork: '+network+'\nBalance TX: '+payment.tx_hash+'\nBalance Received: $'+parseFloat(payment.amount||0).toFixed(2)+'\n\nGo to Admin Panel → Payouts to process.');
 }
 
 async function activateChallenge(payment) {
@@ -148,6 +104,21 @@ async function activateChallenge(payment) {
   console.log('Challenge activated:',accId);
   await sendEmail('New Challenge Activated','Trader: '+profile.full_name+'\nEmail: '+profile.email+'\nAccount: '+accId+'\nEntry: $'+payment.amount+' '+(payment.network==='BEP20'?'USDC':'USDT'));
   await sendTraderEmail(profile.email,'🚀 Your Challenge is Now Active — '+accId,challengeActivatedEmail(profile.full_name||'Trader',accId,parseFloat(payment.amount).toFixed(2),payment.network||'TRC20'));
+
+  // AFFILIATE: check if this user was referred
+  try {
+    const {data:referral}=await supabase.from('affiliates').select('*').eq('referred_id',profile.user_id).eq('status','pending').single();
+    if(referral){
+      // Mark commission as approved and queue for payout
+      await supabase.from('affiliates').update({status:'approved',commission:AFFILIATE_COMMISSION,payment_network:payment.network||'TRC20'}).eq('id',referral.id);
+      // Notify referrer
+      const {data:referrerProfile}=await supabase.from('profiles').select('full_name,email').eq('user_id',referral.referrer_id).single();
+      if(referrerProfile){
+        await sendTraderEmail(referrerProfile.email,'🎁 Referral Commission Earned — $'+AFFILIATE_COMMISSION,affiliateRewardEmail(referrerProfile.full_name||'Trader',profile.full_name||'Trader',AFFILIATE_COMMISSION,payment.network||'TRC20'));
+      }
+      await sendEmail('Affiliate Commission Triggered','Referrer: '+referral.referrer_id+'\nReferred: '+profile.user_id+'\nCommission: $'+AFFILIATE_COMMISSION+'\nNetwork: '+(payment.network||'TRC20'));
+    }
+  } catch(e) { console.log('Affiliate check skipped (no referral found):',e.message); }
 }
 
 async function checkPendingLimitOrders() {
@@ -204,7 +175,6 @@ app.post('/close-position',async(req,res)=>{
     if(!position)return res.status(404).json({error:'Position not found'});
     const{data:account}=await supabase.from('accounts').select('*').eq('account_id',account_id).eq('status','active').single();
     if(!account||account.user_id!==user_id)return res.status(403).json({error:'Unauthorised'});
-    // Use price sent from terminal (live WebSocket price) — fall back to API if not provided
     let exitPrice=exit_price?parseFloat(exit_price):null;
     if(!exitPrice){try{const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+position.symbol);const d=await r.json();if(d.price)exitPrice=parseFloat(d.price);}catch(e){}}
     if(!exitPrice){try{const r=await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol='+position.symbol);const d=await r.json();if(d.price)exitPrice=parseFloat(d.price);}catch(e){}}
@@ -251,23 +221,6 @@ app.post('/close-position',async(req,res)=>{
   }catch(err){res.status(500).json({error:err.message});}
 });
 
-// NEW: Submit $144 balance payment when requesting payout
-app.post('/submit-balance-payment',async(req,res)=>{
-  const{account_id,tx_hash,user_id,network}=req.body;
-  if(!account_id||!tx_hash||!user_id||!network)return res.status(400).json({error:'Missing fields'});
-  try{
-    const{data:account}=await supabase.from('accounts').select('user_id,profit,payout_wallet').eq('account_id',account_id).single();
-    if(!account||account.user_id!==user_id)return res.status(403).json({error:'Unauthorised'});
-    if(!account.payout_wallet)return res.status(400).json({error:'Please enter your payout wallet address first'});
-    if(parseFloat(account.profit||0)<=0)return res.status(400).json({error:'No profit to pay out'});
-    let dup=null;try{const r=await supabase.from('payments').select('id,status').eq('tx_hash',tx_hash).single();dup=r.data;}catch(e){}
-    if(dup)return res.json({success:true,message:'Already submitted',status:dup.status});
-    await supabase.from('payments').insert({user_id,account_id,tx_hash,amount:0,status:'pending',confirmations:0,network,payment_type:'payout_balance'});
-    await supabase.from('accounts').update({payout_balance_pending:true}).eq('account_id',account_id);
-    res.json({success:true,message:'Balance payment submitted. We will verify it on-chain and process your payout this Saturday.'});
-  }catch(err){res.status(500).json({error:err.message});}
-});
-
 app.post('/notify-status',async(req,res)=>{
   const{account_id,status,reason}=req.body;
   if(!account_id||!status)return res.status(400).json({error:'Missing fields'});
@@ -295,7 +248,7 @@ app.post('/notify-payout',async(req,res)=>{
     const{data:profile}=await supabase.from('profiles').select('full_name,email').eq('id',account.user_id).single();
     if(!profile)return res.status(404).json({error:'Profile not found'});
     const payNet=account.payment_network||'TRC20',payCur=payNet==='BEP20'?'USDC':'USDT',payLabel=payNet==='BEP20'?'USDC BEP20':'USDT TRC20';
-    const html=emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);"><div style="font-size:28px">🎉</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#c9a84c;margin:8px 0 0;">Payout Sent!</h1><p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">100% Profit Payment</p></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 20px;">Hi '+profile.full_name+',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Your full 100% profit has been sent.</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">'+account_id+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Payout (100%)</span><span style="color:#c9a84c;font-family:monospace;font-size:16px;font-weight:700;">$'+payout_amount+' '+payCur+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Network</span><span style="color:#e8e6ff;font-size:13px;">'+payLabel+'</span></div><div style="padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">'+wallet_address+'</span></div></div><div style="text-align:center;"><a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge — Only $6 →</a></div></div>');
+    const html=emailWrapper('<div style="background:linear-gradient(135deg,#0f1829,#162038);padding:32px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);"><div style="font-size:28px">🎉</div><h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#c9a84c;margin:8px 0 0;">Payout Sent!</h1><p style="color:#7a7a9a;font-size:14px;margin:8px 0 0;">100% Profit Payment</p></div><div style="padding:32px;"><p style="color:#e8e6ff;margin:0 0 20px;">Hi '+profile.full_name+',</p><p style="color:#7a7a9a;font-size:14px;line-height:1.7;margin:0 0 24px;">Your full 100% profit has been sent.</p><div style="background:#0f1829;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:24px;"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Account</span><span style="color:#a78bfa;font-family:monospace;font-size:13px;">'+account_id+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Payout (100%)</span><span style="color:#c9a84c;font-family:monospace;font-size:16px;font-weight:700;">$'+payout_amount+' '+payCur+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#7a7a9a;font-size:13px;">Network</span><span style="color:#e8e6ff;font-size:13px;">'+payLabel+'</span></div><div style="padding:8px 0;"><span style="color:#7a7a9a;font-size:13px;display:block;margin-bottom:4px;">Wallet</span><span style="color:#e8e6ff;font-family:monospace;font-size:11px;word-break:break-all;">'+wallet_address+'</span></div></div><div style="text-align:center;"><a href="https://fortiqfunded.com/checkout.html" style="display:inline-block;background:linear-gradient(135deg,#6c3de8,#1e5fff);color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:14px;">Start New Challenge — $50 →</a></div></div>');
     await sendTraderEmail(profile.email,'🎉 Payout Sent — $'+payout_amount+' '+payCur,html);
     await sendEmail('Payout Processed — '+account_id,'Account: '+account_id+'\nTrader: '+profile.full_name+'\nAmount: $'+payout_amount+' '+payCur+'\nWallet: '+wallet_address);
     res.json({success:true});
@@ -340,15 +293,56 @@ app.post('/create-stage2',async(req,res)=>{
   }catch(err){res.status(500).json({error:err.message});}
 });
 
+// AFFILIATE ROUTES
+app.post('/register-referral',async(req,res)=>{
+  const{referred_id,referral_code}=req.body;
+  if(!referred_id||!referral_code)return res.status(400).json({error:'Missing fields'});
+  try{
+    // Look up referrer by their user_id (referral code = USR-XXXXXX)
+    const{data:referrer}=await supabase.from('profiles').select('user_id').eq('user_id',referral_code).single();
+    if(!referrer)return res.status(404).json({error:'Invalid referral code'});
+    if(referrer.user_id===referred_id)return res.status(400).json({error:'Cannot refer yourself'});
+    // Check not already referred
+    let existing=null;try{const r=await supabase.from('affiliates').select('id').eq('referred_id',referred_id).single();existing=r.data;}catch(e){}
+    if(existing)return res.json({success:true,message:'Already registered'});
+    await supabase.from('affiliates').insert({referrer_id:referrer.user_id,referred_id,status:'pending',commission:0});
+    res.json({success:true});
+  }catch(err){res.status(500).json({error:err.message});}
+});
+
+app.get('/affiliate-stats',async(req,res)=>{
+  const{user_id}=req.query;
+  if(!user_id)return res.status(400).json({error:'Missing user_id'});
+  try{
+    const{data:profile}=await supabase.from('profiles').select('user_id').eq('id',user_id).single();
+    if(!profile)return res.status(404).json({error:'Profile not found'});
+    const{data:affiliates}=await supabase.from('affiliates').select('*').eq('referrer_id',profile.user_id);
+    const total=(affiliates||[]).length;
+    const approved=(affiliates||[]).filter(a=>a.status==='approved'||a.status==='paid').length;
+    const earned=(affiliates||[]).filter(a=>a.status==='paid').reduce((s,a)=>s+parseFloat(a.commission||0),0);
+    const pending=(affiliates||[]).filter(a=>a.status==='approved').reduce((s,a)=>s+parseFloat(a.commission||0),0);
+    res.json({referral_code:profile.user_id,total_referrals:total,approved_referrals:approved,total_earned:earned,pending_commission:pending,affiliates:affiliates||[]});
+  }catch(err){res.status(500).json({error:err.message});}
+});
+
+app.post('/pay-affiliate',async(req,res)=>{
+  const{affiliate_id}=req.body;
+  if(!affiliate_id)return res.status(400).json({error:'Missing affiliate_id'});
+  try{
+    await supabase.from('affiliates').update({status:'paid'}).eq('id',affiliate_id);
+    res.json({success:true});
+  }catch(err){res.status(500).json({error:err.message});}
+});
+
+app.get('/health',(req,res)=>res.json({status:'ok'}));
+app.get('/',(req,res)=>res.send('Fortiq Funded Backend Running'));
+
 cron.schedule('*/2 * * * *', checkPendingPayments);
 cron.schedule('*/2 * * * *', checkPendingBEP20Payments);
-cron.schedule('*/2 * * * *', checkPendingBalancePayments);
 cron.schedule('*/30 * * * * *', checkPendingLimitOrders);
 cron.schedule('0 0 * * *', async function(){
   try{await supabase.from('accounts').update({daily_loss:0}).in('status',['to_be_active','active','funded']);console.log('Daily loss reset');}catch(err){console.log('Reset failed:',err.message);}
 });
 
-app.get('/',(req,res)=>res.send('Fortiq Funded Backend Running'));
-app.get('/health',(req,res)=>res.json({status:'ok'}));
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>console.log('Server running on port',PORT));
