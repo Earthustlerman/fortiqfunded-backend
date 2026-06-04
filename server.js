@@ -275,15 +275,6 @@ app.post('/verify-recaptcha',async(req,res)=>{
   try{const r=await fetch('https://www.google.com/recaptcha/api/siteverify',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'secret='+process.env.RECAPTCHA_SECRET_KEY+'&response='+token});const d=await r.json();res.json({success:d.success});}catch(err){res.status(500).json({success:false});}
 });
 
-app.post('/save-affiliate-wallet',async(req,res)=>{
-  const{user_id,wallet}=req.body;
-  if(!user_id||!wallet)return res.status(400).json({error:'Missing fields'});
-  try{
-    const{error}=await supabase.from('profiles').update({affiliate_wallet:wallet}).eq('id',user_id);
-    if(error)return res.status(500).json({error:error.message});
-    res.json({success:true});
-  }catch(err){res.status(500).json({error:err.message});}
-});
 
 app.post('/submit-payout-wallet',async(req,res)=>{
   const{account_id,wallet,user_id}=req.body;if(!account_id||!wallet||!user_id)return res.status(400).json({error:'Missing fields'});
